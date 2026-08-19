@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Backend runtime artifacts
+backend/data_cache/*
+!backend/data_cache/.gitkeep
+backend/*.db
+backend/*.db-journal
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+frontend/.env.local
+
+# OS
+.DS_Store
+
+# Env files
+.env
