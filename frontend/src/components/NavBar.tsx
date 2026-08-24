@@ -1,4 +1,16 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const LINKS = [
+  { href: "/", label: "Backtest" },
+  { href: "/daily-log", label: "Daily Log" },
+];
+
 export default function NavBar() {
+  const pathname = usePathname();
+
   return (
     <header className="border-b border-black/10 dark:border-white/10">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
@@ -9,13 +21,19 @@ export default function NavBar() {
           </span>
         </div>
         <nav className="flex items-center gap-4 text-sm">
-          <span className="font-medium text-[color:var(--tile-ink)]">Backtest</span>
-          <span
-            className="cursor-not-allowed text-[#898781]"
-            title="Daily signal log — coming next"
-          >
-            Daily Log (soon)
-          </span>
+          {LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={
+                pathname === link.href
+                  ? "font-medium text-[color:var(--tile-ink)]"
+                  : "text-[#898781] hover:text-[color:var(--tile-ink)]"
+              }
+            >
+              {link.label}
+            </Link>
+          ))}
         </nav>
       </div>
     </header>

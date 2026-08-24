@@ -64,6 +64,15 @@ export interface BacktestResponse {
   config: BacktestConfig;
 }
 
+export interface DailyLogRow {
+  date: string;
+  ndx_close: number;
+  ma_fast: number | null;
+  ma_slow: number | null;
+  target_weight: number;
+  symbol: string;
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export class ApiError extends Error {}
@@ -91,5 +100,36 @@ export async function fetchBacktest(opts: {
     throw new ApiError(detail);
   }
 
+  return res.json();
+}
+
+export async function fetchDailyLog(limit?: number): Promise<{ rows: DailyLogRow[] }> {
+  const params = new URLSearchParams();
+  if (limit) params.set("limit", String(limit));
+
+  const res = await fetch(`${API_BASE}/api/daily-log?${params.toString()}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new ApiError(`Request failed with status ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function refreshDailyLog(): Promise<DailyLogRow> {
+  const res = await fetch(`${API_BASE}/api/daily-log/refresh`, {
+    method: "POST",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    let detail = `Request failed with status ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.detail) detail = body.detail;
+    } catch {
+      // ignore parse errors, fall back to the generic message
+    }
+    throw new ApiError(detail);
+  }
   return res.json();
 }

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import config
 from .backtest import run_backtest
+from .daily_log import get_daily_log, refresh_daily_log
 from .data import DataUnavailableError, get_track_a_dataset
 
 app = FastAPI(title="Backtest Lab API")
@@ -57,3 +58,17 @@ def backtest(
             "track_a_start": config.TRACK_A_START,
         },
     }
+
+
+@app.get("/api/daily-log")
+def daily_log(limit: int | None = Query(None, gt=0)):
+    return {"rows": get_daily_log(limit=limit)}
+
+
+@app.post("/api/daily-log/refresh")
+def daily_log_refresh():
+    try:
+        row = refresh_daily_log()
+    except DataUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return row

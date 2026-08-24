@@ -6,11 +6,11 @@ the original build spec for the full context and rationale.
 
 **MVP scope (this build):** Track A only — a real, honest backtest on actual
 TQQQ/SQQQ/^NDX daily prices from 2010 onward, using a single Job 1 rule (price
-above/below the 50-day and 250-day moving averages). No synthetic leverage
-simulation, no Track B pre-2010 stress test, no daily live-signal tracking yet
-— those come after the backtest itself is trusted. The "exit" for this MVP
-*is* the entry rule flipping (price crosses back below the MAs); a smarter
-Job 3 exit can be layered on top of `backend/app/signals.py` later.
+above/below the 50-day and 250-day moving averages), plus a persisted daily
+signal log so you can track what the live signal says day over day. No
+synthetic leverage simulation, no Track B pre-2010 stress test. The "exit" for
+this MVP *is* the entry rule flipping (price crosses back below the MAs); a
+smarter Job 3 exit can be layered on top of `backend/app/signals.py` later.
 
 ## Architecture
 
@@ -86,10 +86,22 @@ CORS_ORIGINS="http://localhost:3000" uvicorn app.main:app --reload
 - **Summary stats:** CAGR, total return, win rate, profit/loss ratio, max
   drawdown and its duration.
 
+## Daily signal log
+
+The `Daily Log` tab (`frontend/src/app/daily-log`) shows the current dial
+(TQQQ / cash / SQQQ) and a history table + chart. Clicking "Log today's
+signal" calls `POST /api/daily-log/refresh`, which recomputes the Job 1
+signal off the latest `^NDX` data and upserts a row into a local SQLite file
+(`backend/backtestlab.db`, keyed by trading date — safe to click more than
+once on the same day). This is deliberately separate from the backtest: it
+accumulates real history over time regardless of how backtest parameters get
+tuned later, and is the actual "am I doing well" record. There's no
+scheduler yet — you (or a cron job you set up) need to trigger the refresh
+near each day's close.
+
 ## Not built yet (by design, per current priorities)
 
-- Daily persisted signal log / "how am I doing today" dashboard tab
-  (`Daily Log` in the nav is a placeholder).
 - Job 2 (position sizing) and Job 3 (a smarter exit than "the trend flipped").
 - Track B (pre-2010 `^NDX` signal-only stress test).
 - Paper trading / Alpaca integration.
+- Automatic daily scheduling of the signal-log refresh (currently manual/on-demand).
