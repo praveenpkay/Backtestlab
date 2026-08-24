@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: backtestlab-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: CORS_ORIGINS
+        value: http://localhost:3000
+        # After deploying the frontend on Vercel, update this to your
+        # Vercel URL (comma-separated if you keep localhost too) and
+        # redeploy this service -- see README "Deploy your own copy".
