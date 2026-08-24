@@ -9,6 +9,7 @@ from . import config
 from .backtest import run_backtest
 from .daily_log import get_daily_log, refresh_daily_log
 from .data import DataUnavailableError, get_track_a_dataset
+from .exits import ExitConfig
 
 app = FastAPI(title="Backtest Lab API")
 
@@ -32,6 +33,12 @@ def health():
 def backtest(
     initial_capital: float = Query(10_000.0, gt=0),
     refresh: bool = Query(False, description="Force a fresh pull from Yahoo Finance"),
+    enable_stop_loss: bool = Query(True),
+    stop_loss_pct: float = Query(config.EXIT_STOP_LOSS_PCT, gt=0, lt=1),
+    enable_fast_trend_break: bool = Query(True),
+    fast_ma_period: int = Query(config.EXIT_FAST_MA_PERIOD, gt=1),
+    enable_mean_reversion_exit: bool = Query(True),
+    extension_pct: float = Query(config.EXIT_EXTENSION_PCT, gt=0),
 ):
     try:
         dataset = get_track_a_dataset(force_refresh=refresh)
@@ -41,7 +48,15 @@ def backtest(
     if dataset.empty:
         raise HTTPException(status_code=503, detail="No overlapping price history available yet")
 
-    result = run_backtest(dataset, initial_capital=initial_capital)
+    exit_config = ExitConfig(
+        enable_stop_loss=enable_stop_loss,
+        stop_loss_pct=stop_loss_pct,
+        enable_fast_trend_break=enable_fast_trend_break,
+        fast_ma_period=fast_ma_period,
+        enable_mean_reversion_exit=enable_mean_reversion_exit,
+        extension_pct=extension_pct,
+    )
+    result = run_backtest(dataset, initial_capital=initial_capital, exit_config=exit_config)
     return {
         "trade_log": result.trade_log,
         "equity_curve": result.equity_curve,
@@ -56,6 +71,14 @@ def backtest(
             "ma_fast": config.MA_FAST,
             "ma_slow": config.MA_SLOW,
             "track_a_start": config.TRACK_A_START,
+            "exit_rules": {
+                "enable_stop_loss": exit_config.enable_stop_loss,
+                "stop_loss_pct": exit_config.stop_loss_pct,
+                "enable_fast_trend_break": exit_config.enable_fast_trend_break,
+                "fast_ma_period": exit_config.fast_ma_period,
+                "enable_mean_reversion_exit": exit_config.enable_mean_reversion_exit,
+                "extension_pct": exit_config.extension_pct,
+            },
         },
     }
 

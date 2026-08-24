@@ -7,6 +7,8 @@ import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import MonthlyGrid from "@/components/MonthlyGrid";
 import TradeLogTable from "@/components/TradeLogTable";
+import ExitRuleControls, { type ExitRuleState } from "@/components/ExitRuleControls";
+import ExitReasonBreakdown from "@/components/ExitReasonBreakdown";
 
 const WEIGHT_LABEL: Record<number, { label: string; tone: string }> = {
   1: { label: "TQQQ (bullish)", tone: "bg-[#2a78d6]/10 text-[#184f95] dark:text-[#86b6ef]" },
@@ -14,31 +16,50 @@ const WEIGHT_LABEL: Record<number, { label: string; tone: string }> = {
   [-1]: { label: "SQQQ (bearish)", tone: "bg-[#e34948]/10 text-[#d03b3b]" },
 };
 
+const DEFAULT_EXIT_RULES: ExitRuleState = {
+  enableStopLoss: true,
+  stopLossPct: 0.12,
+  enableFastTrendBreak: true,
+  fastMaPeriod: 20,
+  enableMeanReversionExit: true,
+  extensionPct: 0.2,
+};
+
 export default function BacktestPage() {
   const [data, setData] = useState<BacktestResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [initialCapital, setInitialCapital] = useState(10000);
+  const [exitRules, setExitRules] = useState<ExitRuleState>(DEFAULT_EXIT_RULES);
 
   const load = useCallback(async (refresh: boolean) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchBacktest({ initialCapital, refresh });
+      const result = await fetchBacktest({
+        initialCapital,
+        refresh,
+        enableStopLoss: exitRules.enableStopLoss,
+        stopLossPct: exitRules.stopLossPct,
+        enableFastTrendBreak: exitRules.enableFastTrendBreak,
+        fastMaPeriod: exitRules.fastMaPeriod,
+        enableMeanReversionExit: exitRules.enableMeanReversionExit,
+        extensionPct: exitRules.extensionPct,
+      });
       setData(result);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unexpected error fetching backtest results.");
     } finally {
       setLoading(false);
     }
-  }, [initialCapital]);
+  }, [initialCapital, exitRules]);
 
   useEffect(() => {
     // Initial data fetch on mount; load() intentionally sets loading/error/data state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load(false);
-    // Only re-run on mount -- load() is recreated when initialCapital changes but
-    // we don't want to auto-refetch on every keystroke, only on explicit button clicks.
+    // Only re-run on mount -- load() picks up the latest state via the ref below,
+    // but we don't want to auto-refetch on every keystroke, only on explicit clicks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -53,9 +74,10 @@ export default function BacktestPage() {
             Track A backtest — real TQQQ / SQQQ prices, 2010-onward
           </h1>
           <p className="mt-1 text-sm text-[#898781]">
-            Job 1 only: {data ? `${data.config.ma_fast}d` : "50d"} &amp;{" "}
+            Entry (Job 1): {data ? `${data.config.ma_fast}d` : "50d"} &amp;{" "}
             {data ? `${data.config.ma_slow}d` : "250d"} moving averages on {data?.config.index_ticker ?? "^NDX"}.
-            Above both → TQQQ. Below both → SQQQ. Otherwise → cash.
+            Above both → TQQQ. Below both → SQQQ. Otherwise → cash. Exit (Job 3): whichever of the
+            rules below fires first.
           </p>
         </div>
         {currentWeight && (
@@ -98,6 +120,10 @@ export default function BacktestPage() {
         )}
       </div>
 
+      <div className="mb-6">
+        <ExitRuleControls state={exitRules} onChange={setExitRules} />
+      </div>
+
       {error && (
         <div className="mb-6 rounded-lg border border-[#d03b3b]/30 bg-[#d03b3b]/5 px-4 py-3 text-sm text-[#d03b3b]">
           <p className="font-medium">Couldn&apos;t load backtest data.</p>
@@ -120,6 +146,7 @@ export default function BacktestPage() {
           <StatTiles summary={data.summary} />
           <EquityCurveChart rows={data.equity_curve} />
           <DrawdownChart rows={data.drawdown} />
+          <ExitReasonBreakdown breakdown={data.summary.exit_reason_breakdown} />
           <MonthlyGrid rows={data.monthly_returns} />
           <TradeLogTable trades={data.trade_log} />
         </div>

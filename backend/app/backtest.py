@@ -14,9 +14,17 @@ import numpy as np
 import pandas as pd
 
 from . import config
+from .exits import ExitConfig, apply_exit_overlay
 from .signals import compute_signal
 
 TRADING_DAYS_PER_YEAR = 252
+
+# Job1-only baseline: an ExitConfig with every Job 3 rule turned off exactly
+# reproduces the raw entry-signal-flip-only exit (see test_exits.py), so this
+# doubles as run_backtest's "no overlay" default.
+_NO_EXIT_OVERLAY = ExitConfig(
+    enable_stop_loss=False, enable_fast_trend_break=False, enable_mean_reversion_exit=False
+)
 
 
 @dataclass
@@ -29,17 +37,18 @@ class BacktestResult:
 
 
 def _build_trade_log(
-    target_weight: pd.Series,
+    effective_weight: pd.Series,
     tqqq: pd.Series,
     sqqq: pd.Series,
     equity_curve: pd.Series,
+    exit_reason: pd.Series,
 ) -> list[dict]:
-    dates = target_weight.index
-    group_id = (target_weight != target_weight.shift()).cumsum()
+    dates = effective_weight.index
+    group_id = (effective_weight != effective_weight.shift()).cumsum()
     trades: list[dict] = []
 
-    for _, idx in target_weight.groupby(group_id).groups.items():
-        weight = target_weight.loc[idx[0]]
+    for _, idx in effective_weight.groupby(group_id).groups.items():
+        weight = effective_weight.loc[idx[0]]
         if weight == 0:
             continue  # cash periods aren't trades
 
@@ -54,9 +63,11 @@ def _build_trade_log(
         if is_open:
             exit_date = last_held_date
             sell_price = float(asset.iloc[last_held_pos])
+            reason = None
         else:
             exit_date = dates[last_held_pos + 1]
             sell_price = float(asset.loc[exit_date])
+            reason = exit_reason.loc[exit_date]
 
         buy_price = float(asset.loc[entry_date])
         capital_at_entry = float(equity_curve.loc[entry_date])
@@ -78,6 +89,7 @@ def _build_trade_log(
                 "is_profitable": bool(profit > 0),
                 "is_short": bool(weight < 0),
                 "is_open": bool(is_open),
+                "exit_reason": reason,
             }
         )
 
@@ -148,6 +160,11 @@ def _summary_stats(
     avg_loss = float(np.mean([t["profit_pct"] for t in losses])) if losses else 0.0
     profit_loss_ratio = abs(avg_win / avg_loss) if avg_loss else float("inf") if avg_win else 0.0
 
+    exit_reason_breakdown: dict[str, int] = {}
+    for t in completed:
+        reason = t["exit_reason"] or "unknown"
+        exit_reason_breakdown[reason] = exit_reason_breakdown.get(reason, 0) + 1
+
     return {
         "start_date": equity_curve.index[0].strftime("%Y-%m-%d"),
         "end_date": equity_curve.index[-1].strftime("%Y-%m-%d"),
@@ -160,19 +177,29 @@ def _summary_stats(
         "profit_loss_ratio": round(profit_loss_ratio, 3) if np.isfinite(profit_loss_ratio) else None,
         "max_drawdown_pct": round(max_dd * 100, 3),
         "max_drawdown_days": max_dd_days,
+        "exit_reason_breakdown": exit_reason_breakdown,
     }
 
 
-def run_backtest(dataset: pd.DataFrame, initial_capital: float = 10_000.0) -> BacktestResult:
-    """dataset must have columns: ndx, tqqq, sqqq, qqq (Close prices), indexed by Date."""
+def run_backtest(
+    dataset: pd.DataFrame,
+    initial_capital: float = 10_000.0,
+    exit_config: ExitConfig | None = None,
+) -> BacktestResult:
+    """dataset must have columns: ndx, tqqq, sqqq, qqq (Close prices), indexed by Date.
+
+    exit_config controls the Job 3 exit overlay (stop-loss, fast trend-break,
+    mean-reversion extension) on top of the Job 1 entry signal. Defaults to
+    no overlay -- exits purely by the Job 1 signal flipping."""
     signal_df = compute_signal(dataset["ndx"])
-    target_weight = signal_df["target_weight"]
+    overlay = apply_exit_overlay(dataset, signal_df, exit_config or _NO_EXIT_OVERLAY)
+    effective_weight = overlay.effective_weight
 
     tqqq_ret = dataset["tqqq"].pct_change().fillna(0.0)
     sqqq_ret = dataset["sqqq"].pct_change().fillna(0.0)
     qqq_ret = dataset["qqq"].pct_change().fillna(0.0)
 
-    weight_shifted = target_weight.shift(1).fillna(0.0)
+    weight_shifted = effective_weight.shift(1).fillna(0.0)
     strategy_ret = np.where(
         weight_shifted > 0, tqqq_ret, np.where(weight_shifted < 0, sqqq_ret, 0.0)
     )
@@ -184,7 +211,9 @@ def run_backtest(dataset: pd.DataFrame, initial_capital: float = 10_000.0) -> Ba
     dd_series = _drawdown_series(equity_curve)
     max_dd, max_dd_days = _max_drawdown_and_duration(equity_curve)
 
-    trades = _build_trade_log(target_weight, dataset["tqqq"], dataset["sqqq"], equity_curve)
+    trades = _build_trade_log(
+        effective_weight, dataset["tqqq"], dataset["sqqq"], equity_curve, overlay.exit_reason
+    )
     monthly = _monthly_returns(equity_curve)
     summary = _summary_stats(equity_curve, trades, max_dd, max_dd_days)
 
@@ -193,7 +222,7 @@ def run_backtest(dataset: pd.DataFrame, initial_capital: float = 10_000.0) -> Ba
             "date": d.strftime("%Y-%m-%d"),
             "strategy_equity": round(float(s), 2),
             "benchmark_equity": round(float(b), 2),
-            "target_weight": float(target_weight.loc[d]),
+            "target_weight": float(effective_weight.loc[d]),
         }
         for d, s, b in zip(dataset.index, equity_curve, benchmark_curve)
     ]

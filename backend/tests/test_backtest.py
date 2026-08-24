@@ -1,6 +1,7 @@
 import math
 
 from app.backtest import run_backtest
+from app.exits import ExitConfig
 from app.signals import compute_signal
 
 
@@ -86,3 +87,29 @@ def test_monthly_returns_cover_dataset_span(synthetic_dataset):
     periods = {(row["year"], row["month"]) for row in result.monthly_returns}
     expected_periods = {(d.year, d.month) for d in synthetic_dataset.index}
     assert periods == expected_periods
+
+
+def test_exit_overlay_tags_every_completed_trade_with_a_reason(synthetic_dataset):
+    result = run_backtest(synthetic_dataset, exit_config=ExitConfig())
+
+    completed = [t for t in result.trade_log if not t["is_open"]]
+    open_trades = [t for t in result.trade_log if t["is_open"]]
+
+    assert all(t["exit_reason"] is not None for t in completed)
+    assert all(t["exit_reason"] is None for t in open_trades)
+    assert set(result.summary["exit_reason_breakdown"]).issubset(
+        {"signal_flip", "stop_loss", "fast_trend_break", "mean_reversion_extension"}
+    )
+    assert sum(result.summary["exit_reason_breakdown"].values()) == result.summary["num_trades"]
+
+
+def test_exit_overlay_defaults_to_job1_only_when_omitted(synthetic_dataset):
+    with_default = run_backtest(synthetic_dataset)
+    explicit_no_overlay = run_backtest(
+        synthetic_dataset,
+        exit_config=ExitConfig(
+            enable_stop_loss=False, enable_fast_trend_break=False, enable_mean_reversion_exit=False
+        ),
+    )
+    assert with_default.equity_curve == explicit_no_overlay.equity_curve
+    assert with_default.trade_log == explicit_no_overlay.trade_log

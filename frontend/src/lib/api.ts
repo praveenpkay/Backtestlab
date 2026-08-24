@@ -11,6 +11,7 @@ export interface TradeLogRow {
   is_profitable: boolean;
   is_short: boolean;
   is_open: boolean;
+  exit_reason: string | null;
 }
 
 export interface EquityCurveRow {
@@ -43,6 +44,16 @@ export interface SummaryStats {
   profit_loss_ratio: number | null;
   max_drawdown_pct: number;
   max_drawdown_days: number;
+  exit_reason_breakdown: Record<string, number>;
+}
+
+export interface ExitRulesConfig {
+  enable_stop_loss: boolean;
+  stop_loss_pct: number;
+  enable_fast_trend_break: boolean;
+  fast_ma_period: number;
+  enable_mean_reversion_exit: boolean;
+  extension_pct: number;
 }
 
 export interface BacktestConfig {
@@ -53,6 +64,7 @@ export interface BacktestConfig {
   ma_fast: number;
   ma_slow: number;
   track_a_start: string;
+  exit_rules: ExitRulesConfig;
 }
 
 export interface BacktestResponse {
@@ -77,13 +89,29 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"
 
 export class ApiError extends Error {}
 
-export async function fetchBacktest(opts: {
+export interface FetchBacktestOpts {
   initialCapital?: number;
   refresh?: boolean;
-} = {}): Promise<BacktestResponse> {
+  enableStopLoss?: boolean;
+  stopLossPct?: number;
+  enableFastTrendBreak?: boolean;
+  fastMaPeriod?: number;
+  enableMeanReversionExit?: boolean;
+  extensionPct?: number;
+}
+
+export async function fetchBacktest(opts: FetchBacktestOpts = {}): Promise<BacktestResponse> {
   const params = new URLSearchParams();
   if (opts.initialCapital) params.set("initial_capital", String(opts.initialCapital));
   if (opts.refresh) params.set("refresh", "true");
+  if (opts.enableStopLoss !== undefined) params.set("enable_stop_loss", String(opts.enableStopLoss));
+  if (opts.stopLossPct !== undefined) params.set("stop_loss_pct", String(opts.stopLossPct));
+  if (opts.enableFastTrendBreak !== undefined)
+    params.set("enable_fast_trend_break", String(opts.enableFastTrendBreak));
+  if (opts.fastMaPeriod !== undefined) params.set("fast_ma_period", String(opts.fastMaPeriod));
+  if (opts.enableMeanReversionExit !== undefined)
+    params.set("enable_mean_reversion_exit", String(opts.enableMeanReversionExit));
+  if (opts.extensionPct !== undefined) params.set("extension_pct", String(opts.extensionPct));
 
   const res = await fetch(`${API_BASE}/api/backtest?${params.toString()}`, {
     cache: "no-store",

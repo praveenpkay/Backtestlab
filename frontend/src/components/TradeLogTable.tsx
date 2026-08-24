@@ -1,5 +1,12 @@
 import type { TradeLogRow } from "@/lib/api";
 
+const EXIT_REASON_LABEL: Record<string, string> = {
+  signal_flip: "Signal flip",
+  stop_loss: "Stop-loss",
+  fast_trend_break: "Fast trend-break",
+  mean_reversion_extension: "Mean-reversion",
+};
+
 function Badge({ children, tone }: { children: React.ReactNode; tone: "good" | "bad" | "neutral" }) {
   const cls =
     tone === "good"
@@ -19,7 +26,7 @@ export default function TradeLogTable({ trades }: { trades: TradeLogRow[] }) {
         Trade log ({trades.length})
       </h3>
       <div className="max-h-[420px] overflow-auto">
-        <table className="w-full min-w-[820px] border-collapse text-xs">
+        <table className="w-full min-w-[960px] border-collapse text-xs">
           <thead className="sticky top-0 bg-white dark:bg-[#1a1a19]">
             <tr className="text-left text-[#898781]">
               <th className="py-1.5 pr-3 font-medium">Symbol</th>
@@ -32,7 +39,8 @@ export default function TradeLogTable({ trades }: { trades: TradeLogRow[] }) {
               <th className="py-1.5 pr-3 text-right font-medium">Profit</th>
               <th className="py-1.5 pr-3 text-right font-medium">Profit %</th>
               <th className="py-1.5 pr-3 font-medium">Result</th>
-              <th className="py-1.5 font-medium">Side</th>
+              <th className="py-1.5 pr-3 font-medium">Side</th>
+              <th className="py-1.5 font-medium">Exit reason</th>
             </tr>
           </thead>
           <tbody>
@@ -74,8 +82,11 @@ export default function TradeLogTable({ trades }: { trades: TradeLogRow[] }) {
                     <Badge tone="bad">Loss</Badge>
                   )}
                 </td>
-                <td className="py-1.5">
+                <td className="py-1.5 pr-3">
                   <Badge tone="neutral">{t.is_short ? "Short" : "Long"}</Badge>
+                </td>
+                <td className="py-1.5 tabular-nums text-[color:var(--tile-ink)]">
+                  {t.exit_reason ? EXIT_REASON_LABEL[t.exit_reason] ?? t.exit_reason : "—"}
                 </td>
               </tr>
             ))}
