@@ -26,6 +26,7 @@ function defaultRows(): EditableScenario[] {
 export default function ScenariosPage() {
   const [rows, setRows] = useState<EditableScenario[]>(defaultRows());
   const [initialCapital, setInitialCapital] = useState(10000);
+  const [splitDate, setSplitDate] = useState("");
   const [result, setResult] = useState<CompareResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +39,7 @@ export default function ScenariosPage() {
         initialCapital,
         refresh,
         scenarios: rows.map(toScenarioDefinition),
+        walkForwardSplitDate: splitDate || undefined,
       });
       setResult(response);
     } catch (err) {
@@ -83,6 +85,18 @@ export default function ScenariosPage() {
         >
           Refresh price data
         </button>
+        <label className="flex items-center gap-2 text-sm text-[color:var(--tile-ink)]">
+          Walk-forward split (optional)
+          <input
+            type="date"
+            value={splitDate}
+            onChange={(e) => setSplitDate(e.target.value)}
+            className="rounded border border-black/15 bg-transparent px-2 py-1 text-sm text-[color:var(--tile-ink)] dark:border-white/15"
+          />
+        </label>
+        <span className="text-xs text-[#898781]">
+          Set a date to score each scenario in-sample vs. out-of-sample (details in each card below).
+        </span>
       </div>
 
       <div className="mb-6">

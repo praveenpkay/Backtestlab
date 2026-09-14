@@ -165,12 +165,38 @@ export interface ScenarioKpis {
   worst_losing_streak_pct: number;
 }
 
+export interface WalkForwardPeriodKpis {
+  start_date: string;
+  end_date: string;
+  cagr_pct: number;
+  total_return_pct: number;
+  num_trades: number;
+  win_rate_pct: number;
+  profit_loss_ratio: number | null;
+  max_drawdown_pct: number;
+  max_drawdown_days: number;
+  calmar_ratio: number | null;
+  worst_day: { date: string; return_pct: number } | null;
+  max_consecutive_losses: number;
+  worst_losing_streak_pct: number;
+}
+
+export interface WalkForwardResult {
+  split_date: string;
+  in_sample: WalkForwardPeriodKpis;
+  out_of_sample: WalkForwardPeriodKpis;
+  flag: boolean;
+  flag_reason: string | null;
+  error?: string;
+}
+
 export interface ScenarioRow {
   name: string;
   kind: "strategy" | "benchmark";
   kpis: ScenarioKpis;
   equity_curve: EquityCurveRow[];
   readout: string;
+  walk_forward?: WalkForwardResult | null;
 }
 
 export interface ScenarioDefinition {
@@ -293,6 +319,7 @@ export async function compareScenarios(opts: {
   initialCapital?: number;
   refresh?: boolean;
   scenarios?: ScenarioDefinition[];
+  walkForwardSplitDate?: string;
 }): Promise<CompareResponse> {
   const res = await fetch(`${API_BASE}/api/scenarios/compare`, {
     method: "POST",
@@ -302,6 +329,7 @@ export async function compareScenarios(opts: {
       initial_capital: opts.initialCapital ?? 10000,
       refresh: opts.refresh ?? false,
       scenarios: opts.scenarios ?? [],
+      walk_forward_split_date: opts.walkForwardSplitDate || null,
     }),
   });
   if (!res.ok) {

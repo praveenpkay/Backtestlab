@@ -93,6 +93,34 @@ def test_scenarios_compare_endpoint_custom_scenarios(client):
     assert "readout" in my_scenario
 
 
+def test_scenarios_compare_endpoint_includes_walk_forward_when_requested(client, synthetic_dataset):
+    mid_date = synthetic_dataset.index[len(synthetic_dataset) // 2].strftime("%Y-%m-%d")
+    res = client.post(
+        "/api/scenarios/compare",
+        json={
+            "scenarios": [{"name": "My Scenario"}],
+            "walk_forward_split_date": mid_date,
+        },
+    )
+    assert res.status_code == 200
+    body = res.json()
+    my_scenario = next(s for s in body["scenarios"] if s["name"] == "My Scenario")
+    assert my_scenario["walk_forward"] is not None
+    assert my_scenario["walk_forward"]["split_date"] == mid_date
+    assert "in_sample" in my_scenario["walk_forward"]
+    assert "out_of_sample" in my_scenario["walk_forward"]
+
+    benchmark_row = next(s for s in body["scenarios"] if s["kind"] == "benchmark")
+    assert benchmark_row["walk_forward"] is None
+
+
+def test_scenarios_compare_endpoint_omits_walk_forward_by_default(client):
+    res = client.post("/api/scenarios/compare", json={})
+    assert res.status_code == 200
+    body = res.json()
+    assert all("walk_forward" not in s for s in body["scenarios"])
+
+
 def test_signal_history_endpoint_is_labeled_signal_only(synthetic_dataset, monkeypatch):
     from app import main as main_module
 

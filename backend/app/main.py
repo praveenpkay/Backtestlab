@@ -11,9 +11,10 @@ from .backtest import run_backtest
 from .daily_log import get_daily_log, refresh_daily_log
 from .data import DataUnavailableError, get_track_a_dataset, get_track_b_series
 from .exits import ExitConfig
-from .scenarios import Scenario, run_scenarios
+from .scenarios import Scenario, default_scenarios, run_scenarios
 from .sizing import SizingConfig
 from .trackb import compute_track_b_analysis
+from .walkforward import run_walk_forward
 
 app = FastAPI(title="Backtest Lab API")
 
@@ -158,6 +159,7 @@ class CompareRequest(BaseModel):
     initial_capital: float = 10_000.0
     refresh: bool = False
     scenarios: list[ScenarioRequest] = []
+    walk_forward_split_date: str | None = None
 
 
 @app.post("/api/scenarios/compare")
@@ -170,8 +172,29 @@ def scenarios_compare(body: CompareRequest):
     if dataset.empty:
         raise HTTPException(status_code=503, detail="No overlapping price history available yet")
 
-    scenarios = [s.to_scenario() for s in body.scenarios] if body.scenarios else None
+    scenarios = [s.to_scenario() for s in body.scenarios] if body.scenarios else default_scenarios()
     rows = run_scenarios(dataset, scenarios, initial_capital=body.initial_capital)
+
+    if body.walk_forward_split_date:
+        scenarios_by_name = {s.name: s for s in scenarios}
+        for row in rows:
+            if row["kind"] != "strategy":
+                row["walk_forward"] = None
+                continue
+            scenario = scenarios_by_name[row["name"]]
+            try:
+                row["walk_forward"] = run_walk_forward(
+                    dataset,
+                    split_date=body.walk_forward_split_date,
+                    initial_capital=body.initial_capital,
+                    exit_config=scenario.exit_config,
+                    sizing_config=scenario.sizing_config,
+                    ma_fast=scenario.ma_fast,
+                    ma_slow=scenario.ma_slow,
+                )
+            except ValueError as exc:
+                row["walk_forward"] = {"error": str(exc)}
+
     return {"signal_ticker_used": signal_ticker, "data_source": config.DATA_SOURCE, "scenarios": rows}
 
 

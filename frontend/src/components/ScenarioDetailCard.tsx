@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ScenarioRow } from "@/lib/api";
+import WalkForwardPanel from "@/components/WalkForwardPanel";
 
 export default function ScenarioDetailCard({ row }: { row: ScenarioRow }) {
   const [open, setOpen] = useState(false);
@@ -18,7 +19,12 @@ export default function ScenarioDetailCard({ row }: { row: ScenarioRow }) {
       </button>
       <p className="mt-2 text-sm text-[color:var(--tile-ink)]">{row.readout}</p>
       {open && (
-        <div className="mt-3 max-h-[280px] overflow-auto border-t border-black/5 pt-3 dark:border-white/5">
+        <div className="mt-3 max-h-[420px] overflow-auto border-t border-black/5 pt-3 dark:border-white/5">
+          {row.walk_forward && (
+            <div className="mb-4">
+              <WalkForwardPanel result={row.walk_forward} />
+            </div>
+          )}
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#898781]">
             Drawdown episodes ({episodes.length})
           </h4>
