@@ -30,6 +30,7 @@ class Scenario:
     ma_slow: int = config.MA_SLOW
     exit_config: ExitConfig = field(default_factory=ExitConfig)
     sizing_config: SizingConfig = field(default_factory=lambda: SizingConfig(enabled=False))
+    fee_bps: float = config.DEFAULT_FEE_BPS
 
 
 def default_scenarios() -> list[Scenario]:
@@ -77,6 +78,7 @@ def run_scenario(dataset: pd.DataFrame, scenario: Scenario, initial_capital: flo
         sizing_config=scenario.sizing_config,
         ma_fast=scenario.ma_fast,
         ma_slow=scenario.ma_slow,
+        fee_bps=scenario.fee_bps,
     )
     kpis = _augment_kpis(result.summary, result.equity_curve, result.trade_log)
     kpis["worst_month"] = compute_worst_month(result.monthly_returns)

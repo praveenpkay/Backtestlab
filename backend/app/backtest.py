@@ -197,6 +197,7 @@ def run_backtest(
     sizing_config: SizingConfig | None = None,
     ma_fast: int = config.MA_FAST,
     ma_slow: int = config.MA_SLOW,
+    fee_bps: float = 0.0,
 ) -> BacktestResult:
     """dataset must have columns: ndx, tqqq, sqqq, qqq (Close prices), indexed by Date.
 
@@ -208,7 +209,14 @@ def run_backtest(
     based). Defaults to disabled -- always 100% in or out.
 
     ma_fast/ma_slow override the Job 1 entry rule's moving-average lengths
-    (used by the scenario engine to compare different MA choices)."""
+    (used by the scenario engine to compare different MA choices).
+
+    fee_bps is a flat fee/slippage cost in basis points of notional, charged
+    on every rebalance (proportional to how much the target weight actually
+    changed that day -- a pure resize costs less than a full flip). Applied
+    to the equity curve and summary stats; the trade log's buy/sell/profit
+    fields stay gross-of-fees (real market prices), so total_fees_paid in
+    the summary is the number to look at for the aggregate drag."""
     signal_df = compute_signal(dataset["ndx"], ma_fast=ma_fast, ma_slow=ma_slow)
     overlay = apply_exit_overlay(dataset, signal_df, exit_config or _NO_EXIT_OVERLAY)
     sized_weight = apply_sizing(overlay.effective_weight, dataset["ndx"], sizing_config or SizingConfig(enabled=False))
@@ -225,8 +233,16 @@ def run_backtest(
     asset_ret = np.where(weight_shifted > 0, tqqq_ret, np.where(weight_shifted < 0, sqqq_ret, 0.0))
     strategy_ret = pd.Series(weight_shifted.abs().to_numpy() * asset_ret, index=dataset.index)
 
-    equity_curve = initial_capital * (1 + strategy_ret).cumprod()
+    turnover = sized_weight.diff()
+    turnover.iloc[0] = sized_weight.iloc[0]  # first day's move is "from cash" (weight 0)
+    fee_rate = turnover.abs() * (fee_bps / 10_000.0)
+    strategy_ret_after_fees = strategy_ret - fee_rate
+
+    equity_curve = initial_capital * (1 + strategy_ret_after_fees).cumprod()
     benchmark_curve = initial_capital * (1 + qqq_ret).cumprod()
+
+    equity_before_fee = equity_curve.shift(1).fillna(initial_capital)
+    total_fees_paid = float((fee_rate * equity_before_fee).sum())
 
     dd_series = _drawdown_series(equity_curve)
     max_dd, max_dd_days = _max_drawdown_and_duration(equity_curve)
@@ -236,6 +252,8 @@ def run_backtest(
     )
     monthly = _monthly_returns(equity_curve)
     summary = _summary_stats(equity_curve, trades, max_dd, max_dd_days)
+    summary["fee_bps"] = fee_bps
+    summary["total_fees_paid"] = round(total_fees_paid, 2)
 
     equity_curve_rows = [
         {

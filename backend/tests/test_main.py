@@ -23,6 +23,36 @@ def test_backtest_endpoint_defaults_have_exits_enabled(client):
     assert all("exit_reason" in t for t in body["trade_log"])
 
 
+def test_backtest_endpoint_defaults_fees_on(client):
+    res = client.get("/api/backtest")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["config"]["fee_bps"] > 0
+    assert body["summary"]["total_fees_paid"] >= 0
+
+
+def test_backtest_endpoint_can_disable_fees(client):
+    res = client.get("/api/backtest", params={"fee_bps": "0"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["config"]["fee_bps"] == 0.0
+    assert body["summary"]["total_fees_paid"] == 0.0
+
+
+def test_scenarios_compare_endpoint_threads_fee_bps(client):
+    res = client.post(
+        "/api/scenarios/compare",
+        json={"scenarios": [{"name": "No fee scenario", "fee_bps": 0}, {"name": "High fee scenario", "fee_bps": 200}]},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    no_fee = next(s for s in body["scenarios"] if s["name"] == "No fee scenario")
+    high_fee = next(s for s in body["scenarios"] if s["name"] == "High fee scenario")
+    assert no_fee["kpis"]["total_fees_paid"] == 0.0
+    assert high_fee["kpis"]["total_fees_paid"] >= 0.0
+    assert high_fee["kpis"]["final_equity"] <= no_fee["kpis"]["final_equity"]
+
+
 def test_backtest_endpoint_can_disable_all_exit_rules(client):
     res = client.get(
         "/api/backtest",

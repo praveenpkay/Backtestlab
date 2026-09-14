@@ -91,6 +91,7 @@ def run_walk_forward(
     sizing_config: SizingConfig | None = None,
     ma_fast: int | None = None,
     ma_slow: int | None = None,
+    fee_bps: float = 0.0,
 ) -> dict:
     kwargs = {}
     if ma_fast is not None:
@@ -99,7 +100,12 @@ def run_walk_forward(
         kwargs["ma_slow"] = ma_slow
 
     result = run_backtest(
-        dataset, initial_capital=initial_capital, exit_config=exit_config, sizing_config=sizing_config, **kwargs
+        dataset,
+        initial_capital=initial_capital,
+        exit_config=exit_config,
+        sizing_config=sizing_config,
+        fee_bps=fee_bps,
+        **kwargs,
     )
 
     equity = pd.Series({row["date"]: row["strategy_equity"] for row in result.equity_curve})

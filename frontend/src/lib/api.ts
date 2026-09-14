@@ -46,6 +46,8 @@ export interface SummaryStats {
   max_drawdown_pct: number;
   max_drawdown_days: number;
   exit_reason_breakdown: Record<string, number>;
+  fee_bps: number;
+  total_fees_paid: number;
 }
 
 export interface ExitRulesConfig {
@@ -78,6 +80,7 @@ export interface BacktestConfig {
   track_a_start: string;
   exit_rules: ExitRulesConfig;
   sizing: SizingConfigDto;
+  fee_bps: number;
 }
 
 export interface BacktestResponse {
@@ -156,6 +159,8 @@ export interface ScenarioKpis {
   max_drawdown_pct: number;
   max_drawdown_days: number;
   exit_reason_breakdown: Record<string, number>;
+  fee_bps: number;
+  total_fees_paid: number;
   calmar_ratio: number | null;
   drawdown_episodes: DrawdownEpisode[];
   num_drawdowns_over_20pct: number;
@@ -215,6 +220,7 @@ export interface ScenarioDefinition {
   sizing_partial_threshold?: number;
   sizing_partial_weight?: number;
   sizing_min_weight?: number;
+  fee_bps?: number;
 }
 
 export interface CompareResponse {
@@ -242,6 +248,7 @@ export interface FetchBacktestOpts {
   sizingPartialThreshold?: number;
   sizingPartialWeight?: number;
   sizingMinWeight?: number;
+  feeBps?: number;
 }
 
 export async function fetchBacktest(opts: FetchBacktestOpts = {}): Promise<BacktestResponse> {
@@ -265,6 +272,7 @@ export async function fetchBacktest(opts: FetchBacktestOpts = {}): Promise<Backt
   if (opts.sizingPartialWeight !== undefined)
     params.set("sizing_partial_weight", String(opts.sizingPartialWeight));
   if (opts.sizingMinWeight !== undefined) params.set("sizing_min_weight", String(opts.sizingMinWeight));
+  if (opts.feeBps !== undefined) params.set("fee_bps", String(opts.feeBps));
 
   const res = await fetch(`${API_BASE}/api/backtest?${params.toString()}`, {
     cache: "no-store",

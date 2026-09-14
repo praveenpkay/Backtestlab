@@ -1,5 +1,7 @@
 import math
 
+import pytest
+
 from app.backtest import run_backtest
 from app.exits import ExitConfig
 from app.signals import compute_signal
@@ -137,6 +139,59 @@ def test_sizing_enabled_never_exceeds_full_capital_and_tags_resizes(synthetic_da
     assert reasons.issubset(
         {"signal_flip", "stop_loss", "fast_trend_break", "mean_reversion_extension", "resize"}
     )
+
+
+def test_fee_bps_zero_matches_no_fee_default(synthetic_dataset):
+    no_fee_arg = run_backtest(synthetic_dataset)
+    explicit_zero = run_backtest(synthetic_dataset, fee_bps=0.0)
+    assert no_fee_arg.equity_curve == explicit_zero.equity_curve
+    assert no_fee_arg.summary["total_fees_paid"] == 0.0
+    assert no_fee_arg.summary["fee_bps"] == 0.0
+
+
+def test_fee_bps_reduces_final_equity(synthetic_dataset):
+    no_fee = run_backtest(synthetic_dataset, exit_config=ExitConfig())
+    with_fee = run_backtest(synthetic_dataset, exit_config=ExitConfig(), fee_bps=50.0)
+
+    assert with_fee.summary["final_equity"] < no_fee.summary["final_equity"]
+    assert with_fee.summary["total_fees_paid"] > 0.0
+
+
+def test_fee_bps_charges_exact_turnover_hand_computed(monkeypatch):
+    import pandas as pd
+
+    import app.backtest as backtest_module
+
+    idx = pd.bdate_range("2020-01-01", periods=4)
+    dataset = pd.DataFrame(
+        {"ndx": [100.0] * 4, "tqqq": [100.0, 110.0, 121.0, 121.0], "sqqq": [50.0] * 4, "qqq": [10.0] * 4},
+        index=idx,
+    )
+    # Force a known, simple weight path: full long, full long, flat, flat --
+    # one entry (turnover 1.0) and one exit (turnover 1.0), no other rebalances.
+    fixed_signal = pd.DataFrame(
+        {"close": [100.0] * 4, "ma_fast": [90.0] * 4, "ma_slow": [90.0] * 4, "target_weight": [1.0, 1.0, 0.0, 0.0]},
+        index=idx,
+    )
+    monkeypatch.setattr(backtest_module, "compute_signal", lambda close, ma_fast=None, ma_slow=None: fixed_signal)
+
+    result = run_backtest(
+        dataset,
+        initial_capital=10_000.0,
+        exit_config=ExitConfig(enable_stop_loss=False, enable_fast_trend_break=False, enable_mean_reversion_exit=False),
+        fee_bps=100.0,  # 1%
+    )
+
+    # Day0: enter full long from cash -> turnover 1.0, fee = 1% * $10,000 = $100.
+    # Day1: still full long, no change -> turnover 0, no fee.
+    # Day2: exit to cash -> turnover 1.0, fee = 1% of day1's ending equity.
+    day0_equity = 10_000.0 * (1 - 0.01)  # day0 return is 0 (weight_shifted starts at 0) minus the entry fee
+    day1_ret = 110.0 / 100.0 - 1.0  # holding day0's weight (1.0) into day1's TQQQ move
+    day1_equity = day0_equity * (1 + day1_ret)
+    day2_fee = 0.01 * day1_equity
+    expected_total_fees = 100.0 + day2_fee
+
+    assert result.summary["total_fees_paid"] == pytest.approx(expected_total_fees, abs=0.05)
 
 
 def test_sizing_reduces_exposure_and_therefore_volatility(synthetic_dataset):

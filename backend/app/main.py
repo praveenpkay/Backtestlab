@@ -50,6 +50,7 @@ def backtest(
     sizing_partial_threshold: float = Query(config.SIZING_ROC_PARTIAL_THRESHOLD, gt=0),
     sizing_partial_weight: float = Query(config.SIZING_PARTIAL_WEIGHT, gt=0, le=1),
     sizing_min_weight: float = Query(config.SIZING_MIN_WEIGHT, gt=0, le=1),
+    fee_bps: float = Query(config.DEFAULT_FEE_BPS, ge=0),
 ):
     try:
         dataset, signal_ticker = get_track_a_dataset(force_refresh=refresh)
@@ -76,7 +77,11 @@ def backtest(
         min_weight=sizing_min_weight,
     )
     result = run_backtest(
-        dataset, initial_capital=initial_capital, exit_config=exit_config, sizing_config=sizing_config
+        dataset,
+        initial_capital=initial_capital,
+        exit_config=exit_config,
+        sizing_config=sizing_config,
+        fee_bps=fee_bps,
     )
     return {
         "trade_log": result.trade_log,
@@ -110,6 +115,7 @@ def backtest(
                 "partial_weight": sizing_config.partial_weight,
                 "min_weight": sizing_config.min_weight,
             },
+            "fee_bps": fee_bps,
         },
     }
 
@@ -130,6 +136,7 @@ class ScenarioRequest(BaseModel):
     sizing_partial_threshold: float = config.SIZING_ROC_PARTIAL_THRESHOLD
     sizing_partial_weight: float = config.SIZING_PARTIAL_WEIGHT
     sizing_min_weight: float = config.SIZING_MIN_WEIGHT
+    fee_bps: float = config.DEFAULT_FEE_BPS
 
     def to_scenario(self) -> Scenario:
         return Scenario(
@@ -152,6 +159,7 @@ class ScenarioRequest(BaseModel):
                 partial_weight=self.sizing_partial_weight,
                 min_weight=self.sizing_min_weight,
             ),
+            fee_bps=self.fee_bps,
         )
 
 
@@ -191,6 +199,7 @@ def scenarios_compare(body: CompareRequest):
                     sizing_config=scenario.sizing_config,
                     ma_fast=scenario.ma_fast,
                     ma_slow=scenario.ma_slow,
+                    fee_bps=scenario.fee_bps,
                 )
             except ValueError as exc:
                 row["walk_forward"] = {"error": str(exc)}

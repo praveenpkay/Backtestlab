@@ -12,10 +12,16 @@ def generate_readout(name: str, kpis: dict, benchmarks: dict[str, dict] | None =
     lines: list[str] = []
 
     cagr = kpis.get("cagr_pct", 0.0)
+    fee_bps = kpis.get("fee_bps")
+    fee_note = f" (after {fee_bps:.0f} bps/rebalance fees)" if fee_bps else ""
     lines.append(
         f"{name}: {cagr:.1f}% CAGR, {kpis.get('total_return_pct', 0.0):.1f}% total return "
-        f"over {kpis.get('start_date', '?')} to {kpis.get('end_date', '?')}."
+        f"over {kpis.get('start_date', '?')} to {kpis.get('end_date', '?')}{fee_note}."
     )
+
+    total_fees = kpis.get("total_fees_paid")
+    if total_fees:
+        lines.append(f"Fees/slippage cost ${total_fees:,.0f} over that period.")
 
     calmar = kpis.get("calmar_ratio")
     if benchmarks:

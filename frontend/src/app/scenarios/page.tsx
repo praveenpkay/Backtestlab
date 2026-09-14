@@ -9,8 +9,8 @@ import ScenarioDetailCard from "@/components/ScenarioDetailCard";
 
 function defaultRows(): EditableScenario[] {
   return [
-    { id: "s1", name: "Job 1 only (50/250)", maFast: 50, maSlow: 250, exitPreset: "none", enableSizing: false },
-    { id: "s2", name: "Job 1 + Job 3 (50/250)", maFast: 50, maSlow: 250, exitPreset: "default", enableSizing: false },
+    { id: "s1", name: "Job 1 only (50/250)", maFast: 50, maSlow: 250, exitPreset: "none", enableSizing: false, feeBps: 5 },
+    { id: "s2", name: "Job 1 + Job 3 (50/250)", maFast: 50, maSlow: 250, exitPreset: "default", enableSizing: false, feeBps: 5 },
     {
       id: "s3",
       name: "Job 1 + Job 3 + Job 2 (50/250)",
@@ -18,8 +18,9 @@ function defaultRows(): EditableScenario[] {
       maSlow: 250,
       exitPreset: "default",
       enableSizing: true,
+      feeBps: 5,
     },
-    { id: "s4", name: "Faster entry (20/100)", maFast: 20, maSlow: 100, exitPreset: "default", enableSizing: false },
+    { id: "s4", name: "Faster entry (20/100)", maFast: 20, maSlow: 100, exitPreset: "default", enableSizing: false, feeBps: 5 },
   ];
 }
 

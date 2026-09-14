@@ -46,6 +46,10 @@ export default function StatTiles({ summary }: { summary: SummaryStats }) {
         tone="bad"
       />
       <Tile label="Max DD duration" value={`${summary.max_drawdown_days}d`} />
+      <Tile
+        label="Fees/slippage paid"
+        value={summary.total_fees_paid > 0 ? `$${summary.total_fees_paid.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "$0"}
+      />
     </div>
   );
 }

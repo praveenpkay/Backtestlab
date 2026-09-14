@@ -42,6 +42,7 @@ export default function BacktestPage() {
   const [initialCapital, setInitialCapital] = useState(10000);
   const [exitRules, setExitRules] = useState<ExitRuleState>(DEFAULT_EXIT_RULES);
   const [sizing, setSizing] = useState<SizingState>(DEFAULT_SIZING);
+  const [feeBps, setFeeBps] = useState(5);
 
   const load = useCallback(async (refresh: boolean) => {
     setLoading(true);
@@ -62,6 +63,7 @@ export default function BacktestPage() {
         sizingPartialThreshold: sizing.partialThreshold,
         sizingPartialWeight: sizing.partialWeight,
         sizingMinWeight: sizing.minWeight,
+        feeBps,
       });
       setData(result);
     } catch (err) {
@@ -69,7 +71,7 @@ export default function BacktestPage() {
     } finally {
       setLoading(false);
     }
-  }, [initialCapital, exitRules, sizing]);
+  }, [initialCapital, exitRules, sizing, feeBps]);
 
   useEffect(() => {
     // Initial data fetch on mount; load() intentionally sets loading/error/data state.
@@ -142,6 +144,18 @@ export default function BacktestPage() {
         >
           Refresh price data
         </button>
+        <label className="flex items-center gap-2 text-sm text-[color:var(--tile-ink)]">
+          Fees/slippage
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={feeBps}
+            onChange={(e) => setFeeBps(Number(e.target.value))}
+            className="w-16 rounded border border-black/15 bg-transparent px-2 py-1 text-sm tabular-nums dark:border-white/15"
+          />
+          <span className="text-[#898781]">bps/rebalance</span>
+        </label>
         {data && (
           <span className="text-xs text-[#898781]">
             {data.summary.start_date} → {data.summary.end_date}

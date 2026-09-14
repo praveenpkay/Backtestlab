@@ -24,7 +24,8 @@ export default function ScenarioComparisonTable({ rows }: { rows: ScenarioRow[] 
               <th className="py-1.5 pr-3 text-right font-medium">Worst day</th>
               <th className="py-1.5 pr-3 text-right font-medium">Worst month</th>
               <th className="py-1.5 pr-3 text-right font-medium">Losing streak</th>
-              <th className="py-1.5 text-right font-medium">Trades</th>
+              <th className="py-1.5 pr-3 text-right font-medium">Trades</th>
+              <th className="py-1.5 text-right font-medium">Fees paid</th>
             </tr>
           </thead>
           <tbody>
@@ -82,8 +83,13 @@ export default function ScenarioComparisonTable({ rows }: { rows: ScenarioRow[] 
                     ? `${row.kpis.max_consecutive_losses} (${fmtPct(row.kpis.worst_losing_streak_pct)})`
                     : "—"}
                 </td>
-                <td className="py-1.5 text-right tabular-nums text-[color:var(--tile-ink)]">
+                <td className="py-1.5 pr-3 text-right tabular-nums text-[color:var(--tile-ink)]">
                   {row.kpis.num_trades}
+                </td>
+                <td className="py-1.5 text-right tabular-nums text-[color:var(--tile-ink)]">
+                  {row.kpis.total_fees_paid > 0
+                    ? `$${row.kpis.total_fees_paid.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : "$0"}
                 </td>
               </tr>
             ))}

@@ -9,6 +9,7 @@ export interface EditableScenario {
   maSlow: number;
   exitPreset: "none" | "default";
   enableSizing: boolean;
+  feeBps: number;
 }
 
 export function toScenarioDefinition(row: EditableScenario): ScenarioDefinition {
@@ -21,6 +22,7 @@ export function toScenarioDefinition(row: EditableScenario): ScenarioDefinition 
     enable_fast_trend_break: exitsOn,
     enable_mean_reversion_exit: exitsOn,
     enable_sizing: row.enableSizing,
+    fee_bps: row.feeBps,
   };
 }
 
@@ -33,6 +35,7 @@ export function blankScenario(): EditableScenario {
     maSlow: 250,
     exitPreset: "default",
     enableSizing: false,
+    feeBps: 5,
   };
 }
 
@@ -69,6 +72,7 @@ export default function ScenarioEditor({
               <th className="py-1.5 pr-3 font-medium">MA slow</th>
               <th className="py-1.5 pr-3 font-medium">Job 3 exits</th>
               <th className="py-1.5 pr-3 font-medium">Job 2 sizing</th>
+              <th className="py-1.5 pr-3 font-medium">Fees (bps)</th>
               <th className="py-1.5 font-medium"></th>
             </tr>
           </thead>
@@ -116,6 +120,15 @@ export default function ScenarioEditor({
                     checked={row.enableSizing}
                     onChange={(e) => update(row.id, { enableSizing: e.target.checked })}
                     className="h-4 w-4"
+                  />
+                </td>
+                <td className="py-1.5 pr-3">
+                  <input
+                    type="number"
+                    min={0}
+                    value={row.feeBps}
+                    onChange={(e) => update(row.id, { feeBps: Number(e.target.value) })}
+                    className="w-16 rounded border border-black/15 bg-transparent px-2 py-1 tabular-nums text-[color:var(--tile-ink)] dark:border-white/15"
                   />
                 </td>
                 <td className="py-1.5">
