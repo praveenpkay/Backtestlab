@@ -31,6 +31,11 @@ def test_compute_latest_signal_matches_last_row(fake_ndx_history):
     assert result["target_weight"] == expected_sig["target_weight"]
     expected_symbol = {1.0: "TQQQ", -1.0: "SQQQ", 0.0: "CASH"}[expected_sig["target_weight"]]
     assert result["symbol"] == expected_symbol
+    assert isinstance(result["rationale"], str) and len(result["rationale"]) > 0
+    if result["target_weight"] != 0:
+        assert result["next_exit_trigger"] is not None
+    else:
+        assert result["next_exit_trigger"] is None
 
 
 def test_refresh_is_idempotent_for_same_day(fake_ndx_history, temp_db):
@@ -42,6 +47,7 @@ def test_refresh_is_idempotent_for_same_day(fake_ndx_history, temp_db):
     assert row1["date"] == row2["date"]
     assert rows[0]["date"] == row1["date"]
     assert rows[0]["target_weight"] == row1["target_weight"]
+    assert rows[0]["rationale"] == row1["rationale"]
 
 
 def test_get_daily_log_respects_limit(fake_ndx_history, temp_db):

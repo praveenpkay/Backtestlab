@@ -88,6 +88,7 @@ def run_scenario(dataset: pd.DataFrame, scenario: Scenario, initial_capital: flo
         "kind": "strategy",
         "kpis": kpis,
         "equity_curve": result.equity_curve,
+        "trade_log": result.trade_log,
         "readout": generate_readout(scenario.name, kpis),
     }
 
@@ -139,6 +140,7 @@ def compute_buy_and_hold(dataset: pd.DataFrame, price_col: str, name: str, initi
         "kind": "benchmark",
         "kpis": kpis,
         "equity_curve": equity_curve_rows,
+        "trade_log": [],
         "readout": generate_readout(name, kpis),
     }
 

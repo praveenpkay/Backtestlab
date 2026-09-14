@@ -13,6 +13,7 @@ import pandas as pd
 from . import config
 from .data import get_index_history
 from .db import get_connection
+from .rationale import explain_signal, next_exit_trigger
 from .signals import compute_signal
 
 
@@ -29,22 +30,26 @@ def compute_latest_signal() -> dict:
     from the live signal history. Does not persist anything."""
     ndx, signal_ticker = get_index_history()
     sig = compute_signal(ndx)
+    fast_ma_short = ndx.rolling(config.EXIT_FAST_MA_PERIOD).mean()
     last = sig.iloc[-1]
     date = sig.index[-1]
     weight = float(last["target_weight"])
     ma_fast = None if pd.isna(last["ma_fast"]) else float(last["ma_fast"])
     ma_slow = None if pd.isna(last["ma_slow"]) else float(last["ma_slow"])
+    last_fast_ma_short = fast_ma_short.iloc[-1]
+    fast_ma_short_val = None if pd.isna(last_fast_ma_short) else float(last_fast_ma_short)
+    close = float(last["close"])
 
     return {
         "date": date.strftime("%Y-%m-%d"),
-        "ndx_close": float(last["close"]),
+        "ndx_close": close,
         "ma_fast": ma_fast,
         "ma_slow": ma_slow,
         "target_weight": weight,
         "symbol": _symbol_for_weight(weight),
         "signal_ticker": signal_ticker,
-        "rationale": None,
-        "next_exit_trigger": None,
+        "rationale": explain_signal(close, ma_fast, ma_slow, weight),
+        "next_exit_trigger": next_exit_trigger(ma_fast, ma_slow, fast_ma_short_val, weight),
     }
 
 

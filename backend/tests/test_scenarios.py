@@ -16,6 +16,14 @@ def test_run_scenario_produces_kpis_and_readout(synthetic_dataset):
     assert "calmar_ratio" in result["kpis"]
     assert result["kpis"]["worst_day"] is not None
     assert isinstance(result["readout"], str) and len(result["readout"]) > 0
+    assert len(result["trade_log"]) == result["kpis"]["num_trades"] or any(
+        t["is_open"] for t in result["trade_log"]
+    )
+
+
+def test_benchmark_rows_have_empty_trade_log(synthetic_dataset):
+    result = compute_buy_and_hold(synthetic_dataset, "tqqq", "Buy & hold TQQQ", 10_000.0)
+    assert result["trade_log"] == []
 
 
 def test_compute_buy_and_hold_uses_full_capital_always(synthetic_dataset):

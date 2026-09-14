@@ -43,6 +43,18 @@ export default function DailySignalCard({ row }: { row: DailyLogRow | null }) {
           </dd>
         </div>
       </dl>
+      {row.rationale && (
+        <p className="mt-4 border-t border-black/5 pt-3 text-sm text-[color:var(--tile-ink)] dark:border-white/5">
+          <span className="font-medium">Why: </span>
+          {row.rationale}
+        </p>
+      )}
+      {row.next_exit_trigger && (
+        <p className="mt-2 text-sm text-[#898781]">
+          <span className="font-medium text-[color:var(--tile-ink)]">Next exit trigger: </span>
+          {row.next_exit_trigger}
+        </p>
+      )}
     </div>
   );
 }

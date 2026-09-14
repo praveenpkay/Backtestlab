@@ -200,6 +200,7 @@ export interface ScenarioRow {
   kind: "strategy" | "benchmark";
   kpis: ScenarioKpis;
   equity_curve: EquityCurveRow[];
+  trade_log: TradeLogRow[];
   readout: string;
   walk_forward?: WalkForwardResult | null;
 }

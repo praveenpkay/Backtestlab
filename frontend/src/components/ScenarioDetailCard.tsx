@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ScenarioRow } from "@/lib/api";
 import WalkForwardPanel from "@/components/WalkForwardPanel";
+import { downloadCsv } from "@/lib/csv";
 
 export default function ScenarioDetailCard({ row }: { row: ScenarioRow }) {
   const [open, setOpen] = useState(false);
@@ -10,13 +11,25 @@ export default function ScenarioDetailCard({ row }: { row: ScenarioRow }) {
 
   return (
     <div className="rounded-lg border border-black/10 bg-white p-4 dark:border-white/10 dark:bg-[#1a1a19]">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between text-left"
-      >
-        <span className="text-sm font-semibold text-[color:var(--tile-ink)]">{row.name}</span>
-        <span className="text-xs text-[#898781]">{open ? "Hide details ▲" : "Show details ▼"}</span>
-      </button>
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex flex-1 items-center justify-between text-left"
+        >
+          <span className="text-sm font-semibold text-[color:var(--tile-ink)]">{row.name}</span>
+          <span className="text-xs text-[#898781]">{open ? "Hide details ▲" : "Show details ▼"}</span>
+        </button>
+        {row.trade_log.length > 0 && (
+          <button
+            onClick={() =>
+              downloadCsv(`${row.name.replace(/\s+/g, "-").toLowerCase()}-trades.csv`, row.trade_log)
+            }
+            className="shrink-0 rounded border border-black/15 px-2 py-1 text-xs font-medium text-[color:var(--tile-ink)] dark:border-white/15"
+          >
+            Download CSV
+          </button>
+        )}
+      </div>
       <p className="mt-2 text-sm text-[color:var(--tile-ink)]">{row.readout}</p>
       {open && (
         <div className="mt-3 max-h-[420px] overflow-auto border-t border-black/5 pt-3 dark:border-white/5">

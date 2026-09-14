@@ -1,4 +1,5 @@
 import type { TradeLogRow } from "@/lib/api";
+import { downloadCsv } from "@/lib/csv";
 
 const EXIT_REASON_LABEL: Record<string, string> = {
   signal_flip: "Signal flip",
@@ -23,9 +24,18 @@ export default function TradeLogTable({ trades }: { trades: TradeLogRow[] }) {
 
   return (
     <div className="rounded-lg border border-black/10 bg-white p-4 dark:border-white/10 dark:bg-[#1a1a19]">
-      <h3 className="mb-3 text-sm font-semibold text-[color:var(--tile-ink)]">
-        Trade log ({trades.length})
-      </h3>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[color:var(--tile-ink)]">
+          Trade log ({trades.length})
+        </h3>
+        <button
+          onClick={() => downloadCsv(`trade-log-${new Date().toISOString().slice(0, 10)}.csv`, trades)}
+          disabled={trades.length === 0}
+          className="rounded border border-black/15 px-2 py-1 text-xs font-medium text-[color:var(--tile-ink)] disabled:opacity-40 dark:border-white/15"
+        >
+          Download CSV
+        </button>
+      </div>
       <div className="max-h-[420px] overflow-auto">
         <table className="w-full min-w-[1040px] border-collapse text-xs">
           <thead className="sticky top-0 bg-white dark:bg-[#1a1a19]">
