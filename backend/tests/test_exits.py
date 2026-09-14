@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from app.exits import ExitConfig, apply_exit_overlay
+from app.exits import EXIT_RULES, ExitConfig, ExitContext, ExitRule, apply_exit_overlay
 from app.signals import compute_signal
 
 
@@ -109,3 +109,29 @@ def test_all_rules_disabled_reproduces_job1_signal_exactly(synthetic_dataset):
         result.exit_reason.notna(), expected_exit_days, check_names=False
     )
     assert set(result.exit_reason.dropna().unique()) == {"signal_flip"}
+
+
+def test_a_new_rule_can_be_registered_without_touching_the_overlay_loop():
+    """Proves the extensibility claim: a brand-new rule is just a function
+    + one ExitRule entry, with no changes needed in apply_exit_overlay."""
+    idx = pd.bdate_range("2020-01-01", periods=4)
+    dataset = pd.DataFrame(
+        {"ndx": [100, 100, 100, 100], "tqqq": [100, 100, 100, 100], "sqqq": [50, 50, 50, 50]}, index=idx
+    )
+    signal_df = pd.DataFrame(
+        {"close": dataset["ndx"], "ma_fast": [100] * 4, "target_weight": [1.0] * 4}, index=idx
+    )
+
+    def _always_fires(ctx: ExitContext) -> bool:
+        return ctx.i == 2
+
+    custom_rule = ExitRule("custom_test_rule", lambda cfg: True, _always_fires)
+    EXIT_RULES.append(custom_rule)
+    try:
+        cfg = ExitConfig(enable_stop_loss=False, enable_fast_trend_break=False, enable_mean_reversion_exit=False)
+        result = apply_exit_overlay(dataset, signal_df, cfg)
+    finally:
+        EXIT_RULES.remove(custom_rule)
+
+    assert result.exit_reason.iloc[2] == "custom_test_rule"
+    assert list(result.effective_weight) == [1.0, 1.0, 0.0, 0.0]
