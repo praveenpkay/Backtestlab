@@ -3,6 +3,7 @@ import math
 from app.backtest import run_backtest
 from app.exits import ExitConfig
 from app.signals import compute_signal
+from app.sizing import SizingConfig
 
 
 def test_equity_curve_matches_naive_day_by_day_reimplementation(synthetic_dataset):
@@ -113,3 +114,37 @@ def test_exit_overlay_defaults_to_job1_only_when_omitted(synthetic_dataset):
     )
     assert with_default.equity_curve == explicit_no_overlay.equity_curve
     assert with_default.trade_log == explicit_no_overlay.trade_log
+
+
+def test_sizing_disabled_by_default_matches_full_size(synthetic_dataset):
+    no_sizing = run_backtest(synthetic_dataset)
+    explicit_disabled = run_backtest(synthetic_dataset, sizing_config=SizingConfig(enabled=False))
+    assert no_sizing.equity_curve == explicit_disabled.equity_curve
+    assert all(t["size_pct"] == 100.0 for t in no_sizing.trade_log)
+
+
+def test_sizing_enabled_never_exceeds_full_capital_and_tags_resizes(synthetic_dataset):
+    result = run_backtest(
+        synthetic_dataset,
+        exit_config=ExitConfig(),
+        sizing_config=SizingConfig(enabled=True, roc_period=10),
+    )
+
+    for t in result.trade_log:
+        assert 0 < t["size_pct"] <= 100.0
+
+    reasons = {t["exit_reason"] for t in result.trade_log if not t["is_open"]}
+    assert reasons.issubset(
+        {"signal_flip", "stop_loss", "fast_trend_break", "mean_reversion_extension", "resize"}
+    )
+
+
+def test_sizing_reduces_exposure_and_therefore_volatility(synthetic_dataset):
+    full_size = run_backtest(synthetic_dataset, sizing_config=SizingConfig(enabled=False))
+    scaled_down = run_backtest(
+        synthetic_dataset,
+        sizing_config=SizingConfig(enabled=True, full_threshold=999, partial_threshold=999, min_weight=0.3),
+    )
+    # Forcing min_weight (0.3x) for the entire history should shrink the
+    # total return magnitude relative to full-size (both directions).
+    assert abs(scaled_down.summary["total_return_pct"]) < abs(full_size.summary["total_return_pct"])

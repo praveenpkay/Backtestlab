@@ -4,13 +4,13 @@ A personal tool to backtest a trend-following long/short strategy on TQQQ/SQQQ
 (3x leveraged NASDAQ-100 ETFs), signaled off the underlying `^NDX` index. See
 the original build spec for the full context and rationale.
 
-**MVP scope (this build):** Track A only — a real, honest backtest on actual
-TQQQ/SQQQ/^NDX daily prices from 2010 onward. Job 1 (entry/direction: 50-day
-and 250-day moving averages on `^NDX`) plus Job 3 (exit/square-off: three
-basic, toggleable rules — see below), a persisted daily signal log so you can
-track what the live signal says day over day, and a deploy path so you can
-get a real hosted link. No synthetic leverage simulation, no Track B pre-2010
-stress test, no Job 2 (position sizing — still always 100% in or out) yet.
+**Scope so far:** a real, honest backtest on actual TQQQ/SQQQ/^NDX daily
+prices from 2010 onward (Track A) plus a signal-only stress test back to
+1985 (Track B) — Job 1 (entry/direction), Job 2 (position sizing, off by
+default), and Job 3 (exit/square-off, three toggleable rules), a persisted
+daily signal log, and a deploy path so you can get a real hosted link. No
+synthetic leveraged-return simulation anywhere. Scenario comparison and
+walk-forward validation are still in progress (see the build notes below).
 
 ## Architecture
 

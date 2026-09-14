@@ -16,6 +16,7 @@ import pandas as pd
 from . import config
 from .exits import ExitConfig, apply_exit_overlay
 from .signals import compute_signal
+from .sizing import SizingConfig, apply_sizing
 
 TRADING_DAYS_PER_YEAR = 252
 
@@ -37,18 +38,24 @@ class BacktestResult:
 
 
 def _build_trade_log(
-    effective_weight: pd.Series,
+    sized_weight: pd.Series,
     tqqq: pd.Series,
     sqqq: pd.Series,
     equity_curve: pd.Series,
     exit_reason: pd.Series,
 ) -> list[dict]:
-    dates = effective_weight.index
-    group_id = (effective_weight != effective_weight.shift()).cumsum()
+    """sized_weight may be fractional (Job 2 sizing) rather than strictly
+    ±1/0 -- sign(sized_weight) is always the Job1+Job3 direction, magnitude
+    is how much capital is actually deployed. A pure magnitude change with
+    the same sign (a resize, not a real exit) shows up as its own row with
+    exit_reason="resize" rather than a signal-flip/stop-loss/etc reason,
+    since exits.py's reasons only cover real direction changes."""
+    dates = sized_weight.index
+    group_id = (sized_weight != sized_weight.shift()).cumsum()
     trades: list[dict] = []
 
-    for _, idx in effective_weight.groupby(group_id).groups.items():
-        weight = effective_weight.loc[idx[0]]
+    for _, idx in sized_weight.groupby(group_id).groups.items():
+        weight = sized_weight.loc[idx[0]]
         if weight == 0:
             continue  # cash periods aren't trades
 
@@ -67,11 +74,12 @@ def _build_trade_log(
         else:
             exit_date = dates[last_held_pos + 1]
             sell_price = float(asset.loc[exit_date])
-            reason = exit_reason.loc[exit_date]
+            reason = exit_reason.loc[exit_date] or "resize"
 
         buy_price = float(asset.loc[entry_date])
         capital_at_entry = float(equity_curve.loc[entry_date])
-        share_size = capital_at_entry / buy_price if buy_price else 0.0
+        capital_deployed = capital_at_entry * abs(weight)
+        share_size = capital_deployed / buy_price if buy_price else 0.0
         profit = share_size * (sell_price - buy_price)
         profit_pct = (sell_price / buy_price - 1.0) if buy_price else 0.0
 
@@ -84,6 +92,7 @@ def _build_trade_log(
                 "buy_price": round(buy_price, 4),
                 "sell_price": round(sell_price, 4),
                 "share_size": round(share_size, 4),
+                "size_pct": round(abs(weight) * 100, 1),
                 "profit": round(profit, 2),
                 "profit_pct": round(profit_pct * 100, 3),
                 "is_profitable": bool(profit > 0),
@@ -185,25 +194,31 @@ def run_backtest(
     dataset: pd.DataFrame,
     initial_capital: float = 10_000.0,
     exit_config: ExitConfig | None = None,
+    sizing_config: SizingConfig | None = None,
 ) -> BacktestResult:
     """dataset must have columns: ndx, tqqq, sqqq, qqq (Close prices), indexed by Date.
 
     exit_config controls the Job 3 exit overlay (stop-loss, fast trend-break,
     mean-reversion extension) on top of the Job 1 entry signal. Defaults to
-    no overlay -- exits purely by the Job 1 signal flipping."""
+    no overlay -- exits purely by the Job 1 signal flipping.
+
+    sizing_config controls the Job 2 position-sizing overlay (rate-of-change
+    based). Defaults to disabled -- always 100% in or out."""
     signal_df = compute_signal(dataset["ndx"])
     overlay = apply_exit_overlay(dataset, signal_df, exit_config or _NO_EXIT_OVERLAY)
-    effective_weight = overlay.effective_weight
+    sized_weight = apply_sizing(overlay.effective_weight, dataset["ndx"], sizing_config or SizingConfig(enabled=False))
 
     tqqq_ret = dataset["tqqq"].pct_change().fillna(0.0)
     sqqq_ret = dataset["sqqq"].pct_change().fillna(0.0)
     qqq_ret = dataset["qqq"].pct_change().fillna(0.0)
 
-    weight_shifted = effective_weight.shift(1).fillna(0.0)
-    strategy_ret = np.where(
-        weight_shifted > 0, tqqq_ret, np.where(weight_shifted < 0, sqqq_ret, 0.0)
-    )
-    strategy_ret = pd.Series(strategy_ret, index=dataset.index)
+    # weight_shifted's sign picks the asset; its magnitude (Job 2 sizing) is
+    # how much of yesterday's total equity that day's return is applied to,
+    # i.e. the strategy rebalances daily to hold a constant target fraction
+    # (matching the spec's "each day set ONE number: a target weight").
+    weight_shifted = sized_weight.shift(1).fillna(0.0)
+    asset_ret = np.where(weight_shifted > 0, tqqq_ret, np.where(weight_shifted < 0, sqqq_ret, 0.0))
+    strategy_ret = pd.Series(weight_shifted.abs().to_numpy() * asset_ret, index=dataset.index)
 
     equity_curve = initial_capital * (1 + strategy_ret).cumprod()
     benchmark_curve = initial_capital * (1 + qqq_ret).cumprod()
@@ -212,7 +227,7 @@ def run_backtest(
     max_dd, max_dd_days = _max_drawdown_and_duration(equity_curve)
 
     trades = _build_trade_log(
-        effective_weight, dataset["tqqq"], dataset["sqqq"], equity_curve, overlay.exit_reason
+        sized_weight, dataset["tqqq"], dataset["sqqq"], equity_curve, overlay.exit_reason
     )
     monthly = _monthly_returns(equity_curve)
     summary = _summary_stats(equity_curve, trades, max_dd, max_dd_days)
@@ -222,7 +237,7 @@ def run_backtest(
             "date": d.strftime("%Y-%m-%d"),
             "strategy_equity": round(float(s), 2),
             "benchmark_equity": round(float(b), 2),
-            "target_weight": float(effective_weight.loc[d]),
+            "target_weight": float(sized_weight.loc[d]),
         }
         for d, s, b in zip(dataset.index, equity_curve, benchmark_curve)
     ]

@@ -12,6 +12,7 @@ export interface TradeLogRow {
   is_short: boolean;
   is_open: boolean;
   exit_reason: string | null;
+  size_pct: number;
 }
 
 export interface EquityCurveRow {
@@ -56,6 +57,15 @@ export interface ExitRulesConfig {
   extension_pct: number;
 }
 
+export interface SizingConfigDto {
+  enabled: boolean;
+  roc_period: number;
+  full_threshold: number;
+  partial_threshold: number;
+  partial_weight: number;
+  min_weight: number;
+}
+
 export interface BacktestConfig {
   index_ticker: string;
   signal_ticker_used: string;
@@ -67,6 +77,7 @@ export interface BacktestConfig {
   ma_slow: number;
   track_a_start: string;
   exit_rules: ExitRulesConfig;
+  sizing: SizingConfigDto;
 }
 
 export interface BacktestResponse {
@@ -136,6 +147,12 @@ export interface FetchBacktestOpts {
   fastMaPeriod?: number;
   enableMeanReversionExit?: boolean;
   extensionPct?: number;
+  enableSizing?: boolean;
+  sizingRocPeriod?: number;
+  sizingFullThreshold?: number;
+  sizingPartialThreshold?: number;
+  sizingPartialWeight?: number;
+  sizingMinWeight?: number;
 }
 
 export async function fetchBacktest(opts: FetchBacktestOpts = {}): Promise<BacktestResponse> {
@@ -150,6 +167,15 @@ export async function fetchBacktest(opts: FetchBacktestOpts = {}): Promise<Backt
   if (opts.enableMeanReversionExit !== undefined)
     params.set("enable_mean_reversion_exit", String(opts.enableMeanReversionExit));
   if (opts.extensionPct !== undefined) params.set("extension_pct", String(opts.extensionPct));
+  if (opts.enableSizing !== undefined) params.set("enable_sizing", String(opts.enableSizing));
+  if (opts.sizingRocPeriod !== undefined) params.set("sizing_roc_period", String(opts.sizingRocPeriod));
+  if (opts.sizingFullThreshold !== undefined)
+    params.set("sizing_full_threshold", String(opts.sizingFullThreshold));
+  if (opts.sizingPartialThreshold !== undefined)
+    params.set("sizing_partial_threshold", String(opts.sizingPartialThreshold));
+  if (opts.sizingPartialWeight !== undefined)
+    params.set("sizing_partial_weight", String(opts.sizingPartialWeight));
+  if (opts.sizingMinWeight !== undefined) params.set("sizing_min_weight", String(opts.sizingMinWeight));
 
   const res = await fetch(`${API_BASE}/api/backtest?${params.toString()}`, {
     cache: "no-store",

@@ -5,6 +5,7 @@ const EXIT_REASON_LABEL: Record<string, string> = {
   stop_loss: "Stop-loss",
   fast_trend_break: "Fast trend-break",
   mean_reversion_extension: "Mean-reversion",
+  resize: "Resize (Job 2)",
 };
 
 function Badge({ children, tone }: { children: React.ReactNode; tone: "good" | "bad" | "neutral" }) {
@@ -26,7 +27,7 @@ export default function TradeLogTable({ trades }: { trades: TradeLogRow[] }) {
         Trade log ({trades.length})
       </h3>
       <div className="max-h-[420px] overflow-auto">
-        <table className="w-full min-w-[960px] border-collapse text-xs">
+        <table className="w-full min-w-[1040px] border-collapse text-xs">
           <thead className="sticky top-0 bg-white dark:bg-[#1a1a19]">
             <tr className="text-left text-[#898781]">
               <th className="py-1.5 pr-3 font-medium">Symbol</th>
@@ -36,6 +37,7 @@ export default function TradeLogTable({ trades }: { trades: TradeLogRow[] }) {
               <th className="py-1.5 pr-3 text-right font-medium">Buy</th>
               <th className="py-1.5 pr-3 text-right font-medium">Sell</th>
               <th className="py-1.5 pr-3 text-right font-medium">Shares</th>
+              <th className="py-1.5 pr-3 text-right font-medium">Size</th>
               <th className="py-1.5 pr-3 text-right font-medium">Profit</th>
               <th className="py-1.5 pr-3 text-right font-medium">Profit %</th>
               <th className="py-1.5 pr-3 font-medium">Result</th>
@@ -58,6 +60,9 @@ export default function TradeLogTable({ trades }: { trades: TradeLogRow[] }) {
                 </td>
                 <td className="py-1.5 pr-3 text-right tabular-nums text-[color:var(--tile-ink)]">
                   {t.share_size.toFixed(2)}
+                </td>
+                <td className="py-1.5 pr-3 text-right tabular-nums text-[color:var(--tile-ink)]">
+                  {t.size_pct.toFixed(0)}%
                 </td>
                 <td
                   className={`py-1.5 pr-3 text-right tabular-nums ${

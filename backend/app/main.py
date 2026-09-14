@@ -10,6 +10,7 @@ from .backtest import run_backtest
 from .daily_log import get_daily_log, refresh_daily_log
 from .data import DataUnavailableError, get_track_a_dataset, get_track_b_series
 from .exits import ExitConfig
+from .sizing import SizingConfig
 from .trackb import compute_track_b_analysis
 
 app = FastAPI(title="Backtest Lab API")
@@ -40,6 +41,12 @@ def backtest(
     fast_ma_period: int = Query(config.EXIT_FAST_MA_PERIOD, gt=1),
     enable_mean_reversion_exit: bool = Query(True),
     extension_pct: float = Query(config.EXIT_EXTENSION_PCT, gt=0),
+    enable_sizing: bool = Query(False),
+    sizing_roc_period: int = Query(config.SIZING_ROC_PERIOD, gt=0),
+    sizing_full_threshold: float = Query(config.SIZING_ROC_FULL_THRESHOLD, gt=0),
+    sizing_partial_threshold: float = Query(config.SIZING_ROC_PARTIAL_THRESHOLD, gt=0),
+    sizing_partial_weight: float = Query(config.SIZING_PARTIAL_WEIGHT, gt=0, le=1),
+    sizing_min_weight: float = Query(config.SIZING_MIN_WEIGHT, gt=0, le=1),
 ):
     try:
         dataset, signal_ticker = get_track_a_dataset(force_refresh=refresh)
@@ -57,7 +64,17 @@ def backtest(
         enable_mean_reversion_exit=enable_mean_reversion_exit,
         extension_pct=extension_pct,
     )
-    result = run_backtest(dataset, initial_capital=initial_capital, exit_config=exit_config)
+    sizing_config = SizingConfig(
+        enabled=enable_sizing,
+        roc_period=sizing_roc_period,
+        full_threshold=sizing_full_threshold,
+        partial_threshold=sizing_partial_threshold,
+        partial_weight=sizing_partial_weight,
+        min_weight=sizing_min_weight,
+    )
+    result = run_backtest(
+        dataset, initial_capital=initial_capital, exit_config=exit_config, sizing_config=sizing_config
+    )
     return {
         "trade_log": result.trade_log,
         "equity_curve": result.equity_curve,
@@ -81,6 +98,14 @@ def backtest(
                 "fast_ma_period": exit_config.fast_ma_period,
                 "enable_mean_reversion_exit": exit_config.enable_mean_reversion_exit,
                 "extension_pct": exit_config.extension_pct,
+            },
+            "sizing": {
+                "enabled": sizing_config.enabled,
+                "roc_period": sizing_config.roc_period,
+                "full_threshold": sizing_config.full_threshold,
+                "partial_threshold": sizing_config.partial_threshold,
+                "partial_weight": sizing_config.partial_weight,
+                "min_weight": sizing_config.min_weight,
             },
         },
     }

@@ -9,6 +9,7 @@ import MonthlyGrid from "@/components/MonthlyGrid";
 import TradeLogTable from "@/components/TradeLogTable";
 import ExitRuleControls, { type ExitRuleState } from "@/components/ExitRuleControls";
 import ExitReasonBreakdown from "@/components/ExitReasonBreakdown";
+import SizingControls, { type SizingState } from "@/components/SizingControls";
 
 const WEIGHT_LABEL: Record<number, { label: string; tone: string }> = {
   1: { label: "TQQQ (bullish)", tone: "bg-[#2a78d6]/10 text-[#184f95] dark:text-[#86b6ef]" },
@@ -25,12 +26,22 @@ const DEFAULT_EXIT_RULES: ExitRuleState = {
   extensionPct: 0.2,
 };
 
+const DEFAULT_SIZING: SizingState = {
+  enabled: false,
+  rocPeriod: 20,
+  fullThreshold: 0.1,
+  partialThreshold: 0.03,
+  partialWeight: 0.65,
+  minWeight: 0.3,
+};
+
 export default function BacktestPage() {
   const [data, setData] = useState<BacktestResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [initialCapital, setInitialCapital] = useState(10000);
   const [exitRules, setExitRules] = useState<ExitRuleState>(DEFAULT_EXIT_RULES);
+  const [sizing, setSizing] = useState<SizingState>(DEFAULT_SIZING);
 
   const load = useCallback(async (refresh: boolean) => {
     setLoading(true);
@@ -45,6 +56,12 @@ export default function BacktestPage() {
         fastMaPeriod: exitRules.fastMaPeriod,
         enableMeanReversionExit: exitRules.enableMeanReversionExit,
         extensionPct: exitRules.extensionPct,
+        enableSizing: sizing.enabled,
+        sizingRocPeriod: sizing.rocPeriod,
+        sizingFullThreshold: sizing.fullThreshold,
+        sizingPartialThreshold: sizing.partialThreshold,
+        sizingPartialWeight: sizing.partialWeight,
+        sizingMinWeight: sizing.minWeight,
       });
       setData(result);
     } catch (err) {
@@ -52,7 +69,7 @@ export default function BacktestPage() {
     } finally {
       setLoading(false);
     }
-  }, [initialCapital, exitRules]);
+  }, [initialCapital, exitRules, sizing]);
 
   useEffect(() => {
     // Initial data fetch on mount; load() intentionally sets loading/error/data state.
@@ -132,8 +149,9 @@ export default function BacktestPage() {
         )}
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 flex flex-col gap-3">
         <ExitRuleControls state={exitRules} onChange={setExitRules} />
+        <SizingControls state={sizing} onChange={setSizing} />
       </div>
 
       {error && (
@@ -141,8 +159,8 @@ export default function BacktestPage() {
           <p className="font-medium">Couldn&apos;t load backtest data.</p>
           <p className="mt-1">{error}</p>
           <p className="mt-1 text-[#898781]">
-            This usually means the backend can&apos;t reach Yahoo Finance and has no cached data yet — run
-            the backend somewhere with normal internet access at least once.
+            This usually means the backend can&apos;t reach its configured data source and has no
+            cached data yet — run the backend somewhere with normal internet access at least once.
           </p>
         </div>
       )}

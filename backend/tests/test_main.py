@@ -47,6 +47,23 @@ def test_backtest_endpoint_respects_custom_thresholds(client):
     assert body["config"]["exit_rules"]["fast_ma_period"] == 10
 
 
+def test_backtest_endpoint_sizing_disabled_by_default(client):
+    res = client.get("/api/backtest")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["config"]["sizing"]["enabled"] is False
+    assert all(t["size_pct"] == 100.0 for t in body["trade_log"])
+
+
+def test_backtest_endpoint_can_enable_sizing(client):
+    res = client.get("/api/backtest", params={"enable_sizing": "true", "sizing_roc_period": "10"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["config"]["sizing"]["enabled"] is True
+    assert body["config"]["sizing"]["roc_period"] == 10
+    assert all(0 < t["size_pct"] <= 100.0 for t in body["trade_log"])
+
+
 def test_signal_history_endpoint_is_labeled_signal_only(synthetic_dataset, monkeypatch):
     from app import main as main_module
 
