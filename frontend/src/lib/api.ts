@@ -134,6 +134,69 @@ export interface SignalHistoryResponse {
   regime_stats: RegimeStats;
 }
 
+export interface DrawdownEpisode {
+  peak_date: string;
+  trough_date: string;
+  recovery_date: string | null;
+  depth_pct: number;
+  length_days: number;
+  is_ongoing: boolean;
+}
+
+export interface ScenarioKpis {
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  final_equity: number;
+  cagr_pct: number;
+  total_return_pct: number;
+  num_trades: number;
+  win_rate_pct: number;
+  profit_loss_ratio: number | null;
+  max_drawdown_pct: number;
+  max_drawdown_days: number;
+  exit_reason_breakdown: Record<string, number>;
+  calmar_ratio: number | null;
+  drawdown_episodes: DrawdownEpisode[];
+  num_drawdowns_over_20pct: number;
+  worst_day: { date: string; return_pct: number } | null;
+  worst_month: { year: number; month: number; return_pct: number } | null;
+  max_consecutive_losses: number;
+  worst_losing_streak_pct: number;
+}
+
+export interface ScenarioRow {
+  name: string;
+  kind: "strategy" | "benchmark";
+  kpis: ScenarioKpis;
+  equity_curve: EquityCurveRow[];
+  readout: string;
+}
+
+export interface ScenarioDefinition {
+  name: string;
+  ma_fast?: number;
+  ma_slow?: number;
+  enable_stop_loss?: boolean;
+  stop_loss_pct?: number;
+  enable_fast_trend_break?: boolean;
+  fast_ma_period?: number;
+  enable_mean_reversion_exit?: boolean;
+  extension_pct?: number;
+  enable_sizing?: boolean;
+  sizing_roc_period?: number;
+  sizing_full_threshold?: number;
+  sizing_partial_threshold?: number;
+  sizing_partial_weight?: number;
+  sizing_min_weight?: number;
+}
+
+export interface CompareResponse {
+  signal_ticker_used: string;
+  data_source: string;
+  scenarios: ScenarioRow[];
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export class ApiError extends Error {}
@@ -212,6 +275,34 @@ export async function refreshDailyLog(): Promise<DailyLogRow> {
   const res = await fetch(`${API_BASE}/api/daily-log/refresh`, {
     method: "POST",
     cache: "no-store",
+  });
+  if (!res.ok) {
+    let detail = `Request failed with status ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.detail) detail = body.detail;
+    } catch {
+      // ignore parse errors, fall back to the generic message
+    }
+    throw new ApiError(detail);
+  }
+  return res.json();
+}
+
+export async function compareScenarios(opts: {
+  initialCapital?: number;
+  refresh?: boolean;
+  scenarios?: ScenarioDefinition[];
+}): Promise<CompareResponse> {
+  const res = await fetch(`${API_BASE}/api/scenarios/compare`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify({
+      initial_capital: opts.initialCapital ?? 10000,
+      refresh: opts.refresh ?? false,
+      scenarios: opts.scenarios ?? [],
+    }),
   });
   if (!res.ok) {
     let detail = `Request failed with status ${res.status}`;

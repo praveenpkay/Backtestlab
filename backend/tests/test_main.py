@@ -64,6 +64,35 @@ def test_backtest_endpoint_can_enable_sizing(client):
     assert all(0 < t["size_pct"] <= 100.0 for t in body["trade_log"])
 
 
+def test_scenarios_compare_endpoint_defaults(client):
+    res = client.post("/api/scenarios/compare", json={})
+    assert res.status_code == 200
+    body = res.json()
+    names = [s["name"] for s in body["scenarios"]]
+    assert "Buy & hold TQQQ" in names
+    assert "Buy & hold QQQ" in names
+    assert len(names) >= 4  # default scenarios + 2 benchmarks
+
+
+def test_scenarios_compare_endpoint_custom_scenarios(client):
+    res = client.post(
+        "/api/scenarios/compare",
+        json={
+            "initial_capital": 5000,
+            "scenarios": [
+                {"name": "My Scenario", "ma_fast": 10, "ma_slow": 40, "enable_sizing": True}
+            ],
+        },
+    )
+    assert res.status_code == 200
+    body = res.json()
+    names = [s["name"] for s in body["scenarios"]]
+    assert names == ["My Scenario", "Buy & hold TQQQ", "Buy & hold QQQ"]
+    my_scenario = body["scenarios"][0]
+    assert my_scenario["kpis"]["initial_capital"] == 5000.0
+    assert "readout" in my_scenario
+
+
 def test_signal_history_endpoint_is_labeled_signal_only(synthetic_dataset, monkeypatch):
     from app import main as main_module
 

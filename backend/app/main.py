@@ -4,12 +4,14 @@ import os
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from . import config
 from .backtest import run_backtest
 from .daily_log import get_daily_log, refresh_daily_log
 from .data import DataUnavailableError, get_track_a_dataset, get_track_b_series
 from .exits import ExitConfig
+from .scenarios import Scenario, run_scenarios
 from .sizing import SizingConfig
 from .trackb import compute_track_b_analysis
 
@@ -109,6 +111,68 @@ def backtest(
             },
         },
     }
+
+
+class ScenarioRequest(BaseModel):
+    name: str
+    ma_fast: int = config.MA_FAST
+    ma_slow: int = config.MA_SLOW
+    enable_stop_loss: bool = True
+    stop_loss_pct: float = config.EXIT_STOP_LOSS_PCT
+    enable_fast_trend_break: bool = True
+    fast_ma_period: int = config.EXIT_FAST_MA_PERIOD
+    enable_mean_reversion_exit: bool = True
+    extension_pct: float = config.EXIT_EXTENSION_PCT
+    enable_sizing: bool = False
+    sizing_roc_period: int = config.SIZING_ROC_PERIOD
+    sizing_full_threshold: float = config.SIZING_ROC_FULL_THRESHOLD
+    sizing_partial_threshold: float = config.SIZING_ROC_PARTIAL_THRESHOLD
+    sizing_partial_weight: float = config.SIZING_PARTIAL_WEIGHT
+    sizing_min_weight: float = config.SIZING_MIN_WEIGHT
+
+    def to_scenario(self) -> Scenario:
+        return Scenario(
+            name=self.name,
+            ma_fast=self.ma_fast,
+            ma_slow=self.ma_slow,
+            exit_config=ExitConfig(
+                enable_stop_loss=self.enable_stop_loss,
+                stop_loss_pct=self.stop_loss_pct,
+                enable_fast_trend_break=self.enable_fast_trend_break,
+                fast_ma_period=self.fast_ma_period,
+                enable_mean_reversion_exit=self.enable_mean_reversion_exit,
+                extension_pct=self.extension_pct,
+            ),
+            sizing_config=SizingConfig(
+                enabled=self.enable_sizing,
+                roc_period=self.sizing_roc_period,
+                full_threshold=self.sizing_full_threshold,
+                partial_threshold=self.sizing_partial_threshold,
+                partial_weight=self.sizing_partial_weight,
+                min_weight=self.sizing_min_weight,
+            ),
+        )
+
+
+class CompareRequest(BaseModel):
+    initial_capital: float = 10_000.0
+    refresh: bool = False
+    scenarios: list[ScenarioRequest] = []
+
+
+@app.post("/api/scenarios/compare")
+def scenarios_compare(body: CompareRequest):
+    try:
+        dataset, signal_ticker = get_track_a_dataset(force_refresh=body.refresh)
+    except DataUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    if dataset.empty:
+        raise HTTPException(status_code=503, detail="No overlapping price history available yet")
+
+    scenarios = [s.to_scenario() for s in body.scenarios] if body.scenarios else None
+    rows = run_scenarios(dataset, scenarios, initial_capital=body.initial_capital)
+    return {"signal_ticker_used": signal_ticker, "data_source": config.DATA_SOURCE, "scenarios": rows}
 
 
 @app.get("/api/signal-history")

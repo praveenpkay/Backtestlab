@@ -195,6 +195,8 @@ def run_backtest(
     initial_capital: float = 10_000.0,
     exit_config: ExitConfig | None = None,
     sizing_config: SizingConfig | None = None,
+    ma_fast: int = config.MA_FAST,
+    ma_slow: int = config.MA_SLOW,
 ) -> BacktestResult:
     """dataset must have columns: ndx, tqqq, sqqq, qqq (Close prices), indexed by Date.
 
@@ -203,8 +205,11 @@ def run_backtest(
     no overlay -- exits purely by the Job 1 signal flipping.
 
     sizing_config controls the Job 2 position-sizing overlay (rate-of-change
-    based). Defaults to disabled -- always 100% in or out."""
-    signal_df = compute_signal(dataset["ndx"])
+    based). Defaults to disabled -- always 100% in or out.
+
+    ma_fast/ma_slow override the Job 1 entry rule's moving-average lengths
+    (used by the scenario engine to compare different MA choices)."""
+    signal_df = compute_signal(dataset["ndx"], ma_fast=ma_fast, ma_slow=ma_slow)
     overlay = apply_exit_overlay(dataset, signal_df, exit_config or _NO_EXIT_OVERLAY)
     sized_weight = apply_sizing(overlay.effective_weight, dataset["ndx"], sizing_config or SizingConfig(enabled=False))
 
