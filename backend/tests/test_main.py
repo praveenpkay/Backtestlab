@@ -6,7 +6,9 @@ from app import main as main_module
 
 @pytest.fixture
 def client(synthetic_dataset, monkeypatch):
-    monkeypatch.setattr(main_module, "get_track_a_dataset", lambda force_refresh=False: synthetic_dataset)
+    monkeypatch.setattr(
+        main_module, "get_track_a_dataset", lambda force_refresh=False: (synthetic_dataset, "^NDX")
+    )
     return TestClient(main_module.app)
 
 
@@ -43,3 +45,19 @@ def test_backtest_endpoint_respects_custom_thresholds(client):
     body = res.json()
     assert body["config"]["exit_rules"]["stop_loss_pct"] == 0.05
     assert body["config"]["exit_rules"]["fast_ma_period"] == 10
+
+
+def test_signal_history_endpoint_is_labeled_signal_only(synthetic_dataset, monkeypatch):
+    from app import main as main_module
+
+    monkeypatch.setattr(
+        main_module, "get_track_b_series", lambda force_refresh=False: (synthetic_dataset["ndx"], "^NDX")
+    )
+    client = TestClient(main_module.app)
+
+    res = client.get("/api/signal-history")
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["signal_only"] is True
+    assert len(body["series"]) == len(synthetic_dataset)

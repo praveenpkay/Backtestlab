@@ -79,6 +79,18 @@ export default function BacktestPage() {
             Above both → TQQQ. Below both → SQQQ. Otherwise → cash. Exit (Job 3): whichever of the
             rules below fires first.
           </p>
+          {data && (
+            <p className="mt-1 text-xs text-[#898781]">
+              Data source: {data.config.data_source}
+              {data.config.signal_ticker_used !== data.config.index_ticker && (
+                <>
+                  {" "}
+                  — signal computed on {data.config.signal_ticker_used} (proxy for {data.config.index_ticker}
+                  , unavailable from this data source)
+                </>
+              )}
+            </p>
+          )}
         </div>
         {currentWeight && (
           <div className={`rounded-lg px-3 py-2 text-sm font-medium ${currentWeight.tone}`}>

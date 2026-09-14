@@ -21,6 +21,15 @@ CREATE TABLE IF NOT EXISTS daily_log (
 );
 """
 
+# Columns added after the initial release. SQLite has no "ADD COLUMN IF NOT
+# EXISTS", so we just try each and ignore "duplicate column" -- cheap and
+# safe for a single-table personal-tool database.
+_MIGRATIONS = [
+    "ALTER TABLE daily_log ADD COLUMN signal_ticker TEXT",
+    "ALTER TABLE daily_log ADD COLUMN rationale TEXT",
+    "ALTER TABLE daily_log ADD COLUMN next_exit_trigger TEXT",
+]
+
 
 @contextmanager
 def get_connection():
@@ -28,6 +37,11 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     try:
         conn.execute(_SCHEMA)
+        for migration in _MIGRATIONS:
+            try:
+                conn.execute(migration)
+            except sqlite3.OperationalError:
+                pass  # column already exists
         yield conn
         conn.commit()
     finally:

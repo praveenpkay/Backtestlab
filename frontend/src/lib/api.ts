@@ -58,6 +58,8 @@ export interface ExitRulesConfig {
 
 export interface BacktestConfig {
   index_ticker: string;
+  signal_ticker_used: string;
+  data_source: string;
   long_ticker: string;
   short_ticker: string;
   benchmark_ticker: string;
@@ -83,6 +85,42 @@ export interface DailyLogRow {
   ma_slow: number | null;
   target_weight: number;
   symbol: string;
+  signal_ticker: string | null;
+  rationale: string | null;
+  next_exit_trigger: string | null;
+}
+
+export interface SignalHistoryRow {
+  date: string;
+  close: number;
+  ma_fast: number | null;
+  ma_slow: number | null;
+  target_weight: number;
+}
+
+export interface RegimeStreak {
+  count: number;
+  longest_days: number;
+}
+
+export interface RegimeStats {
+  pct_days_long: number;
+  pct_days_short: number;
+  pct_days_cash: number;
+  num_regime_changes: number;
+  long_streaks: RegimeStreak;
+  short_streaks: RegimeStreak;
+  cash_streaks: RegimeStreak;
+}
+
+export interface SignalHistoryResponse {
+  signal_only: true;
+  disclaimer: string;
+  ticker_used: string;
+  start_date: string | null;
+  end_date: string | null;
+  series: SignalHistoryRow[];
+  regime_stats: RegimeStats;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -147,6 +185,26 @@ export async function fetchDailyLog(limit?: number): Promise<{ rows: DailyLogRow
 export async function refreshDailyLog(): Promise<DailyLogRow> {
   const res = await fetch(`${API_BASE}/api/daily-log/refresh`, {
     method: "POST",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    let detail = `Request failed with status ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.detail) detail = body.detail;
+    } catch {
+      // ignore parse errors, fall back to the generic message
+    }
+    throw new ApiError(detail);
+  }
+  return res.json();
+}
+
+export async function fetchSignalHistory(refresh?: boolean): Promise<SignalHistoryResponse> {
+  const params = new URLSearchParams();
+  if (refresh) params.set("refresh", "true");
+
+  const res = await fetch(`${API_BASE}/api/signal-history?${params.toString()}`, {
     cache: "no-store",
   });
   if (!res.ok) {

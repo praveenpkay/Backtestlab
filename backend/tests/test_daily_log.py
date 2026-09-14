@@ -8,14 +8,13 @@ from app.signals import compute_signal
 
 @pytest.fixture
 def fake_ndx_history(synthetic_dataset, monkeypatch):
-    history = pd.DataFrame({"Close": synthetic_dataset["ndx"]})
+    close = synthetic_dataset["ndx"]
 
-    def _fake_get_price_history(ticker, force_refresh=False):
-        assert ticker == config.INDEX_TICKER
-        return history
+    def _fake_get_index_history(force_refresh=False, start=None):
+        return close, config.INDEX_TICKER
 
-    monkeypatch.setattr(daily_log_module, "get_price_history", _fake_get_price_history)
-    return history
+    monkeypatch.setattr(daily_log_module, "get_index_history", _fake_get_index_history)
+    return pd.DataFrame({"Close": close})
 
 
 @pytest.fixture

@@ -14,21 +14,45 @@ stress test, no Job 2 (position sizing — still always 100% in or out) yet.
 
 ## Architecture
 
-- **`backend/`** — Python FastAPI service. Pulls daily prices via yfinance,
-  computes the signal, runs the backtest, and serves the results as JSON.
+- **`backend/`** — Python FastAPI service. Pulls daily prices from a
+  pluggable data source, computes the signal, runs the backtest, and serves
+  the results as JSON.
 - **`frontend/`** — Next.js app. Fetches `/api/backtest` and renders the
   equity curve, drawdown chart, monthly return grid, summary stats, and trade
   log.
 
-## Important: this needs real internet access to Yahoo Finance
+## Data sources
 
-The backend fetches price data from Yahoo Finance via `yfinance`. If you're
-running this in a network-restricted environment (like a CI sandbox), the
-`/api/backtest` endpoint will return a `503` with a clear error message
-instead of crashing. Run the backend on your own machine (or anywhere with
-normal internet access) at least once to populate `backend/data_cache/` —
-after that, cached data is reused for up to `CACHE_TTL_HOURS` (see
-`backend/app/config.py`) even if Yahoo is briefly unreachable.
+Real data only, from each fund's real inception (TQQQ/SQQQ from 2010) — this
+app never fabricates or simulates pre-inception leveraged-ETF prices.
+
+- **Stooq (default, no setup)** — `backend/app/datasources/stooq.py`. Free,
+  documented, no API key. This is what the app uses out of the box
+  (`DATA_SOURCE=stooq`).
+- **Polygon.io (optional)** — free key, ~2 minutes to get:
+  1. Sign up at https://polygon.io/dashboard/signup and copy your API key.
+  2. `cp backend/.env.example backend/.env`, paste it into `POLYGON_API_KEY=`.
+  3. Set `DATA_SOURCE=polygon` in that same `.env` file.
+- **Alpaca (optional)** — free key pair, ~2 minutes to get:
+  1. Sign up at https://app.alpaca.markets/signup (the free paper-trading
+     account includes market data).
+  2. Copy the key ID and secret into `backend/.env`
+     (`ALPACA_API_KEY_ID=`, `ALPACA_SECRET_KEY=`).
+  3. Set `DATA_SOURCE=alpaca`.
+
+Neither key is required — the app works fully with zero setup on Stooq. If
+`^NDX` isn't available from whatever source is configured, the app falls
+back to `QQQ` as the signal proxy automatically, and labels results
+accordingly (both on the backtest page and in `/api/backtest`'s
+`config.signal_ticker_used` field) so you always know which one was actually
+used.
+
+If you're running this in a network-restricted environment (like a CI
+sandbox), `/api/backtest` returns a `503` with a clear error message instead
+of crashing. Run the backend somewhere with normal internet access at least
+once to populate `backend/data_cache/` — after that, cached data is reused
+for up to `CACHE_TTL_HOURS` (see `backend/app/config.py`) even if the data
+source is briefly unreachable.
 
 ## Running it locally
 

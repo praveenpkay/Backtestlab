@@ -8,8 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import config
 from .backtest import run_backtest
 from .daily_log import get_daily_log, refresh_daily_log
-from .data import DataUnavailableError, get_track_a_dataset
+from .data import DataUnavailableError, get_track_a_dataset, get_track_b_series
 from .exits import ExitConfig
+from .trackb import compute_track_b_analysis
 
 app = FastAPI(title="Backtest Lab API")
 
@@ -32,7 +33,7 @@ def health():
 @app.get("/api/backtest")
 def backtest(
     initial_capital: float = Query(10_000.0, gt=0),
-    refresh: bool = Query(False, description="Force a fresh pull from Yahoo Finance"),
+    refresh: bool = Query(False, description="Force a fresh pull from the configured data source"),
     enable_stop_loss: bool = Query(True),
     stop_loss_pct: float = Query(config.EXIT_STOP_LOSS_PCT, gt=0, lt=1),
     enable_fast_trend_break: bool = Query(True),
@@ -41,7 +42,7 @@ def backtest(
     extension_pct: float = Query(config.EXIT_EXTENSION_PCT, gt=0),
 ):
     try:
-        dataset = get_track_a_dataset(force_refresh=refresh)
+        dataset, signal_ticker = get_track_a_dataset(force_refresh=refresh)
     except DataUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -65,6 +66,8 @@ def backtest(
         "summary": result.summary,
         "config": {
             "index_ticker": config.INDEX_TICKER,
+            "signal_ticker_used": signal_ticker,
+            "data_source": config.DATA_SOURCE,
             "long_ticker": config.LONG_TICKER,
             "short_ticker": config.SHORT_TICKER,
             "benchmark_ticker": config.BENCHMARK_TICKER,
@@ -81,6 +84,21 @@ def backtest(
             },
         },
     }
+
+
+@app.get("/api/signal-history")
+def signal_history(refresh: bool = Query(False)):
+    """Track B: signal-only stress test on long-history index data (back to
+    config.TRACK_B_START). Never returns simulated dollar returns."""
+    try:
+        close, ticker_used = get_track_b_series(force_refresh=refresh)
+    except DataUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    if close.empty:
+        raise HTTPException(status_code=503, detail="No long-history signal data available yet")
+
+    return compute_track_b_analysis(close, ticker_used)
 
 
 @app.get("/api/daily-log")
